@@ -12,31 +12,39 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore-compat.js"></script>
     <script src="https://unpkg.com/alpinejs" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+
 
     <style>
         /* Gaya CSS */
         .parameter-input-group { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; padding: 0.5rem; border: 1px solid #e5e7eb; background-color: white; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out; }
-        .parameter-input-group input[type="text"] { flex-grow: 1; min-width: 150px; border: 1px solid #d1d5db; padding: 0.5rem; border-radius: 0.375rem; font-size: 0.875rem; }
+        .parameter-input-group input[type="text"] { flex-grow: 1; min-width: 150px; border: 1px solid #d1d5db; padding: 0.5rem; border-radius: 0.375rem; font-size: 0.875rem; /* Ukuran font input */ }
         .model-input-group { padding: 0.75rem; border: 1px solid #e5e7eb; background-color: white; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
         .model-name-row { display: flex; gap: 0.5rem; align-items: center; }
-        .model-name-row input[type="text"] { flex-grow: 1; min-width: 150px; border: 1px solid #d1d5db; padding: 0.5rem; border-radius: 0.375rem; font-size: 0.875rem; }
-        .scores-container { display: flex; flex-wrap: wrap; gap: 0.75rem; padding-top: 0.5rem; border-top: 1px solid #f3f4f6; justify-content: flex-start; }
+        .model-name-row input[type="text"] { flex-grow: 1; min-width: 150px; border: 1px solid #d1d5db; padding: 0.5rem; border-radius: 0.375rem; font-size: 0.875rem; /* Ukuran font input */ }
+        /* Gaya scores-container diatur oleh JS dengan grid, tapi tambahkan padding/border di sini */
+        .scores-container {
+            padding-top: 0.5rem;
+            border-top: 1px solid #f3f4f6;
+        }
         .score-input-group { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 80px; }
         .score-input-group label { font-size: 0.75rem; color: #6b7280; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; display: block; cursor: default; }
-        .score-input-group input[type="number"] { width: 100%; box-sizing: border-box; border: 1px solid #d1d5db; padding: 0.5rem; border-radius: 0.375rem; text-align: center; font-size: 0.875rem; }
+        .score-input-group input[type="number"] { width: 100%; box-sizing: border-box; border: 1px solid #d1d5db; padding: 0.5rem; border-radius: 0.375rem; text-align: center; font-size: 0.875rem; /* Ukuran font input */ }
+        /* Penyesuaian Chart Container untuk responsivitas */
         #chartContainer {
-            width: 100%;
-            min-height: 300px;
-            height: 50vh;
-            max-height: 450px;
+            width: 100%; /* Lebar penuh mengikuti kolom */
+            min-height: 300px; /* Tinggi minimal */
+            height: 50vh; /* Tinggi relatif terhadap viewport */
+            max-height: 450px; /* Batas tinggi maksimum */
             margin: 1rem auto;
             border: 1px solid #ccc;
-            display: block;
+            display: block; /* Pastikan block untuk width 100% */
         }
-        @media (min-width: 1024px) {
+        @media (min-width: 1024px) { /* lg breakpoint */
             #chartContainer {
-                 height: 65vh;
-                 max-height: none;
+                 height: 65vh; /* Tinggi lebih besar di desktop */
+                 max-height: none; /* Hapus batas tinggi maks di desktop */
             }
         }
         .remove-btn { padding: 0.5rem; font-size: 0.75rem; line-height: 1; background-color: #ef4444; color: white; border-radius: 0.375rem; transition: background-color 0.2s; flex-shrink: 0; }
@@ -53,7 +61,7 @@
         /* Gaya Modal Umum */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 50; }
         .modal-content { background-color: white; padding: 1.5rem; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; position: relative; }
-        /* *** PERUBAHAN: Gaya Tombol Tutup Modal *** */
+        /* Gaya Tombol Tutup Modal */
         .modal-close-btn {
             position: absolute;
             top: 0.75rem;
@@ -80,19 +88,20 @@
         .history-item:hover { background-color: #f3f4f6; }
         .history-item-time { font-size: 0.8rem; color: #6b7280; }
         .history-item-models { font-size: 0.9rem; color: #374151; margin-top: 0.25rem; }
+        /* Gaya untuk nama histori dan input editnya */
         .history-entry-name {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #1f2937;
+            font-size: 1rem; /* Sedikit lebih besar */
+            font-weight: 600; /* Semi-bold */
+            color: #1f2937; /* Darker gray */
             margin-bottom: 0.25rem;
-            cursor: text;
-            display: block;
-            padding: 2px 4px;
+            cursor: text; /* Indikasi bisa diedit */
+            display: block; /* Agar bisa diklik */
+            padding: 2px 4px; /* Sedikit padding */
             border-radius: 0.25rem;
             transition: background-color 0.2s;
         }
         .history-entry-name:hover {
-            background-color: #f9fafb;
+            background-color: #f9fafb; /* Light hover */
         }
         .history-name-input {
             font-size: 1rem;
@@ -101,13 +110,13 @@
             padding: 2px 4px;
             border: 1px solid #d1d5db;
             border-radius: 0.25rem;
-            width: calc(100% - 8px);
+            width: calc(100% - 8px); /* Sesuaikan lebar */
             box-sizing: border-box;
             margin-bottom: 0.25rem;
         }
         .history-name-input:focus {
             outline: none;
-            border-color: #4f46e5;
+            border-color: #4f46e5; /* Indigo */
             box-shadow: 0 0 0 1px #4f46e5;
         }
 
@@ -121,12 +130,13 @@
 
         /* Gaya untuk Spinner Loading */
         .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #3498db; /* Blue */
             border-radius: 50%;
             width: 30px;
             height: 30px;
             animation: spin 1s linear infinite;
+            /* Dihapus margin auto agar bisa flex */
         }
 
         @keyframes spin {
@@ -141,20 +151,41 @@
         }
 
         .shimmer-text {
-            background: linear-gradient(to right, #b0b0b0 20%, #d0d0d0 50%, #b0b0b0 80%);
+            background: linear-gradient(to right, #b0b0b0 20%, #d0d0d0 50%, #b0b0b0 80%); /* Warna lebih gelap agar kontras */
             background-size: 2000px 100%;
             color: transparent;
             background-clip: text;
-            -webkit-background-clip: text;
+            -webkit-background-clip: text; /* Untuk Safari/Chrome */
             animation: shimmer 2s linear infinite;
-            display: inline-block;
+            display: inline-block; /* Diperlukan untuk background-clip: text */
         }
+
+        /* Gaya Preloader */
+        #preloader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff; /* Warna background preloader */
+            z-index: 9999; /* Pastikan di atas konten lain */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* Hapus gaya spinner CSS lama */
+        /* #preloader .spinner { ... } */
+
 
         [x-cloak] { display: none !important; }
     </style>
 </head>
 
 <body class="font-sans bg-gray-100 p-4 md:p-6 lg:p-8">
+
+    <div id="preloader">
+        <lottie-player src="https://assets10.lottiefiles.com/packages/lf20_p8bfn5to.json" background="transparent" speed="1" style="width: 150px; height: 150px;" loop autoplay></lottie-player>
+    </div>
 
     <div x-data x-init="
             window.toast = function(message, options = {}){
@@ -362,7 +393,7 @@
                                 </div>
                             </template>
                             <template x-if="toast.html"> <div x-html="toast.html"></div> </template>
-                             <span
+                            <span
                                 @click="burnToast(toast.id)"
                                 class="absolute right-0 p-1 text-white bg-red-500 rounded-full opacity-0 cursor-pointer hover:bg-red-600 transition-colors duration-150 flex items-center justify-center w-5 h-5"
                                 :class="{ 'top-1/2 -translate-y-1/2 mr-2' : !toast.description && !toast.html, 'top-1.5 right-1.5' : (toast.description || toast.html), 'opacity-100' : toastHovered || toastsHovered, 'opacity-0' : !toastHovered && !toastsHovered }">
@@ -491,7 +522,6 @@
         const deleteConfirmMessage = document.getElementById('deleteConfirmMessage');
         const cancelDeleteBtnModal = document.getElementById('cancelDeleteBtn');
         const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-        // *** BARU: Referensi tombol tutup modal delete ***
         const closeDeleteConfirmModalBtn = document.getElementById('closeDeleteConfirmModalBtn');
         let fusionChartInstance = null;
         let draggedItem = null;
@@ -571,7 +601,7 @@
              const modelGroups = modelContainer.querySelectorAll('.model-input-group');
              modelGroups.forEach((group, index) => { if (index > 0) group.remove(); else { group.dataset.modelId = generateUniqueId('model'); const input = group.querySelector('.model-name'); if (input) input.value = ''; const scoresContainer = group.querySelector('.scores-container'); if (scoresContainer) scoresContainer.innerHTML = ''; } });
              if (modelContainer.children.length === 0) addModelInput();
-             updateModelInputs();
+             updateModelInputs(); // Ini akan memanggil updateModelInputsForGroup
              updateRemoveButtons('#parameterContainer', '.parameter-input-group');
              updateRemoveButtons('#modelContainer', '.model-input-group');
              // Kosongkan juga tabel kesimpulan
@@ -632,7 +662,7 @@
                     <input type="text" name="modelName[]" placeholder="Nama Model" class="model-name p-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required value="${initialValue}">
                     <button type="button" class="remove-btn remove-model-btn" onclick="removeInputGroup(this, '#modelContainer', '.model-input-group')" title="Hapus Model">X</button>
                 </div>
-                <div class="scores-container"></div>`;
+                <div class="scores-container"></div>`; // Kelas grid ditambahkan oleh JS
             modelContainer.appendChild(newInputGroup);
             updateModelInputsForGroup(newInputGroup, null);
             updateRemoveButtons('#modelContainer', '.model-input-group');
@@ -659,6 +689,14 @@
             if (!scoresContainer) return;
             const modelId = modelGroup.dataset.modelId;
 
+                        // *** PERUBAHAN: Tentukan kelas grid berdasarkan jumlah parameter ***
+                        const parameterCount = parameterContainer.querySelectorAll('.parameter-input-group').length;
+                        if (parameterCount > 1) {
+                            scoresContainer.className = 'scores-container grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4'; // 2 kolom jika > 1 param
+                        } else {
+                            scoresContainer.className = 'scores-container grid grid-cols-1 gap-3'; // 1 kolom jika 1 param
+                        }
+
             if (!paramIdToNameMap) {
                 paramIdToNameMap = {};
                 parameterContainer.querySelectorAll('.parameter-input-group').forEach(pg => {
@@ -678,7 +716,7 @@
                 }
             });
 
-            scoresContainer.innerHTML = '';
+            scoresContainer.innerHTML = ''; // Kosongkan
             const parameterGroups = parameterContainer.querySelectorAll('.parameter-input-group');
             parameterGroups.forEach((paramGroup) => {
                 const paramId = paramGroup.dataset.paramId;
@@ -686,7 +724,7 @@
 
                 const paramName = paramIdToNameMap[paramId] || 'Parameter';
                 const scoreInputDiv = document.createElement('div');
-                scoreInputDiv.className = 'score-input-group';
+                scoreInputDiv.className = 'score-input-group'; // Kelas ini tetap
                 const inputId = `score_${modelId}_${paramId}`;
                 scoreInputDiv.innerHTML = `
                     <label for="${inputId}" class="block text-center" title="${paramName}">${paramName}</label>
@@ -1255,7 +1293,7 @@
                     nameSpan.className = 'history-entry-name'; // Terapkan gaya CSS
                     nameSpan.textContent = entryName;
                     nameSpan.title = "Klik untuk edit nama histori"; // Tooltip
-                    // *** PERBAIKAN: Tambahkan event.stopPropagation() ***
+                    // Tambahkan event listener untuk edit inline
                     nameSpan.addEventListener('click', (event) => {
                         event.stopPropagation(); // Hentikan event agar tidak trigger loadHistoryEntry
                         enableHistoryNameEditing(nameSpan, docId);
@@ -1400,7 +1438,6 @@
         historyModal.addEventListener('click', (event) => { if (event.target === historyModal) { closeHistoryModal(); } }); // Klik luar modal histori
         cancelDeleteBtnModal.addEventListener('click', closeDeleteConfirmModal);
         confirmDeleteBtn.addEventListener('click', executeDeleteHistoryEntry);
-        // *** PERUBAHAN: Tambahkan listener untuk tombol tutup modal delete ***
         if (closeDeleteConfirmModalBtn) {
             closeDeleteConfirmModalBtn.addEventListener('click', closeDeleteConfirmModal);
         }
@@ -1423,6 +1460,21 @@
             // Alpine akan menginisialisasi komponennya sendiri setelahnya
             initializeFirebase();
         });
+
+         // GSAP Preloader Animation
+         window.onload = () => {
+            const preloader = document.getElementById('preloader');
+            if (preloader) {
+                gsap.to(preloader, {
+                    opacity: 0,
+                    duration: 0.8, // Durasi fade out
+                    ease: "power2.inOut",
+                    onComplete: () => {
+                        preloader.style.display = 'none'; // Sembunyikan setelah animasi
+                    }
+                });
+            }
+        };
 
     </script>
 
