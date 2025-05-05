@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualisasi Skor Benchmark Model (Firebase)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.fusioncharts.com/fusioncharts/latest/fusioncharts.js"></script>
+    <script src="https://cdn.fusioncharts.com/fusioncharts/latest/fusioncharts.charts.js"></script>
+    <script src="https://cdn.fusioncharts.com/fusioncharts/latest/themes/fusioncharts.theme.fusion.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore-compat.js"></script>
+    <script src="https://unpkg.com/alpinejs" defer></script>
+
+    <style>
+        /* Gaya CSS */
+        .parameter-input-group { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; padding: 0.5rem; border: 1px solid #e5e7eb; background-color: white; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out; }
+        .parameter-input-group input[type="text"] { flex-grow: 1; min-width: 150px; border: 1px solid #d1d5db; padding: 0.5rem; border-radius: 0.375rem; font-size: 0.875rem; }
+        .model-input-group { padding: 0.75rem; border: 1px solid #e5e7eb; background-color: white; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+        .model-name-row { display: flex; gap: 0.5rem; align-items: center; }
+        .model-name-row input[type="text"] { flex-grow: 1; min-width: 150px; border: 1px solid #d1d5db; padding: 0.5rem; border-radius: 0.375rem; font-size: 0.875rem; }
+        .scores-container { display: flex; flex-wrap: wrap; gap: 0.75rem; padding-top: 0.5rem; border-top: 1px solid #f3f4f6; justify-content: flex-start; }
+        .score-input-group { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 80px; }
+        .score-input-group label { font-size: 0.75rem; color: #6b7280; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; display: block; cursor: default; }
+        .score-input-group input[type="number"] { width: 100%; box-sizing: border-box; border: 1px solid #d1d5db; padding: 0.5rem; border-radius: 0.375rem; text-align: center; font-size: 0.875rem; }
+        #chartContainer {
+            width: 100%;
+            min-height: 300px;
+            height: 50vh;
+            max-height: 450px;
+            margin: 1rem auto;
+            border: 1px solid #ccc;
+            display: block;
+        }
+        @media (min-width: 1024px) {
+            #chartContainer {
+                 height: 65vh;
+                 max-height: none;
+            }
+        }
+        .remove-btn { padding: 0.5rem; font-size: 0.75rem; line-height: 1; background-color: #ef4444; color: white; border-radius: 0.375rem; transition: background-color 0.2s; flex-shrink: 0; }
+        .remove-btn:hover { background-color: #dc2626; }
+        .remove-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .drag-handle { cursor: grab; padding: 0.5rem; margin-right: 0.5rem; color: #9ca3af; user-select: none; font-size: 1.25rem; line-height: 1; flex-shrink: 0; }
+        .drag-handle:active { cursor: grabbing; }
+        .parameter-input-group.dragging { opacity: 0.4; background-color: #e0e7ff; border-style: dashed; }
+        .drag-over-target { position: relative; }
+        .drag-over-target::before { content: ''; position: absolute; top: -4px; left: 0; right: 0; height: 4px; background-color: #4f46e5; border-radius: 2px; z-index: 10; }
+        .drag-over-target.drop-after::before { top: auto; bottom: -4px; }
+        .hidden { display: none; }
+
+        /* Gaya Modal Umum */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 50; }
+        .modal-content { background-color: white; padding: 1.5rem; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; position: relative; }
+        /* *** PERUBAHAN: Gaya Tombol Tutup Modal *** */
+        .modal-close-btn {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background-color: #ef4444; /* red-500 */
+            color: white;
+            border: none;
+            border-radius: 50%; /* Lingkaran */
+            width: 1.75rem; /* Ukuran tetap */
+            height: 1.75rem;
+            font-size: 1rem; /* Sesuaikan ukuran 'x' */
+            line-height: 1.75rem; /* Pusatkan 'x' secara vertikal */
+            text-align: center; /* Pusatkan 'x' secara horizontal */
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .modal-close-btn:hover {
+            background-color: #dc2626; /* red-600 */
+        }
+
+        /* Gaya Item Histori */
+        .history-item-wrapper { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+        .history-item { flex-grow: 1; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 0.375rem; cursor: pointer; transition: background-color 0.2s; }
+        .history-item:hover { background-color: #f3f4f6; }
+        .history-item-time { font-size: 0.8rem; color: #6b7280; }
+        .history-item-models { font-size: 0.9rem; color: #374151; margin-top: 0.25rem; }
+        .history-entry-name {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+            cursor: text;
+            display: block;
+            padding: 2px 4px;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s;
+        }
+        .history-entry-name:hover {
+            background-color: #f9fafb;
+        }
+        .history-name-input {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1f2937;
+            padding: 2px 4px;
+            border: 1px solid #d1d5db;
+            border-radius: 0.25rem;
+            width: calc(100% - 8px);
+            box-sizing: border-box;
+            margin-bottom: 0.25rem;
+        }
+        .history-name-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 1px #4f46e5;
+        }
+
+        .history-action-btn { padding: 0.4rem 0.6rem; font-size: 0.7rem; line-height: 1; color: white; border: none; border-radius: 0.375rem; cursor: pointer; transition: background-color 0.2s; flex-shrink: 0; }
+        .history-edit-btn { background-color: #60a5fa; } .history-edit-btn:hover { background-color: #3b82f6; }
+        .history-delete-btn { background-color: #f87171; } .history-delete-btn:hover { background-color: #ef4444; }
+
+        /* Gaya Modal Konfirmasi Hapus */
+        #deleteConfirmModal .modal-content { max-width: 400px; }
+        .confirm-buttons { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
+
+        /* Gaya untuk Spinner Loading */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Gaya untuk efek shimmer */
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+
+        .shimmer-text {
+            background: linear-gradient(to right, #b0b0b0 20%, #d0d0d0 50%, #b0b0b0 80%);
+            background-size: 2000px 100%;
+            color: transparent;
+            background-clip: text;
+            -webkit-background-clip: text;
+            animation: shimmer 2s linear infinite;
+            display: inline-block;
+        }
+
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+
+<body class="font-sans bg-gray-100 p-4 md:p-6 lg:p-8">
+
+    <div x-data x-init="
+            window.toast = function(message, options = {}){
+                let description = '';
+                let type = 'default';
+                let position = 'top-center'; // Default position
+                let html = '';
+                if(typeof options.description != 'undefined') description = options.description;
+                if(typeof options.type != 'undefined') type = options.type;
+                if(typeof options.position != 'undefined') position = options.position;
+                if(typeof options.html != 'undefined') html = options.html;
+
+                // Pastikan Alpine sudah siap sebelum dispatch event
+                if (window.Alpine) {
+                     window.dispatchEvent(new CustomEvent('toast-show', { detail : { type: type, message: message, description: description, position : position, html: html }}));
+                } else {
+                    // Fallback atau tunda jika Alpine belum siap
+                    document.addEventListener('alpine:initialized', () => {
+                         window.dispatchEvent(new CustomEvent('toast-show', { detail : { type: type, message: message, description: description, position : position, html: html }}));
+                    });
+                }
+            }
+        ">
+        <template x-teleport="body">
+            <ul
+                x-data="{
+                    toasts: [],
+                    toastsHovered: false,
+                    expanded: false,
+                    layout: 'default',
+                    position: 'top-center',
+                    paddingBetweenToasts: 15,
+                    // Fungsi-fungsi toast (burnToast, getToastWithId, stackToasts, dll.) - Versi Original
+                    deleteToastWithId (id){ for(let i = 0; i < this.toasts.length; i++){ if(this.toasts[i].id === id){ this.toasts.splice(i, 1); break; } } },
+                    burnToast(id){
+                        let burnToast = this.getToastWithId(id);
+                        if (!burnToast) return;
+                        let burnToastElement = document.getElementById(burnToast.id);
+                        if(burnToastElement){
+                            if(this.toasts.length == 1){
+                                if(this.layout=='default'){ this.expanded = false; }
+                                burnToastElement.classList.remove('translate-y-0');
+                                if(this.position.includes('bottom')){ burnToastElement.classList.add('translate-y-full'); }
+                                else { burnToastElement.classList.add('-translate-y-full'); }
+                            }
+                            burnToastElement.classList.add('opacity-0');
+                            let that = this;
+                            setTimeout(function(){ that.deleteToastWithId(id); setTimeout(function(){ that.stackToasts(); }, 1); }, 300);
+                        }
+                    },
+                    getToastWithId(id){ for(let i = 0; i < this.toasts.length; i++){ if(this.toasts[i].id === id){ return this.toasts[i]; } } return null; },
+                    stackToasts(){ this.positionToasts(); this.calculateHeightOfToastsContainer(); let that = this; setTimeout(function(){ that.calculateHeightOfToastsContainer(); }, 300); },
+                    positionToasts(){
+                        if(this.toasts.length == 0) return;
+                        let topToast = document.getElementById( this.toasts[0].id );
+                        if (!topToast) return;
+                        topToast.style.zIndex = 100;
+                        if(this.expanded){
+                            if(this.position.includes('bottom')){ topToast.style.top = 'auto'; topToast.style.bottom = '0px'; }
+                            else { topToast.style.top = '0px'; }
+                        }
+
+                        if(this.toasts.length == 1) return;
+                        let middleToast = document.getElementById( this.toasts[1].id );
+                         if (!middleToast) return;
+                        middleToast.style.zIndex = 90;
+                        let middleToastPosition;
+                        if(this.expanded){
+                            middleToastPosition = topToast.getBoundingClientRect().height + this.paddingBetweenToasts + 'px';
+                            if(this.position.includes('bottom')){ middleToast.style.top = 'auto'; middleToast.style.bottom = middleToastPosition; }
+                            else { middleToast.style.top = middleToastPosition; }
+                            middleToast.style.scale = '100%'; middleToast.style.transform = 'translateY(0px)';
+                        } else {
+                            middleToast.style.scale = '94%';
+                            if(this.position.includes('bottom')){ middleToast.style.transform = 'translateY(-16px)'; }
+                            else { this.alignBottom(topToast, middleToast); middleToast.style.transform = 'translateY(16px)'; }
+                        }
+
+                        if(this.toasts.length == 2) return;
+                        let bottomToast = document.getElementById( this.toasts[2].id );
+                         if (!bottomToast) return;
+                        bottomToast.style.zIndex = 80;
+                        let bottomToastPosition;
+                        if(this.expanded){
+                             bottomToastPosition = topToast.getBoundingClientRect().height + this.paddingBetweenToasts + middleToast.getBoundingClientRect().height + this.paddingBetweenToasts + 'px';
+                            if(this.position.includes('bottom')){ bottomToast.style.top = 'auto'; bottomToast.style.bottom = bottomToastPosition; }
+                            else { bottomToast.style.top = bottomToastPosition; }
+                            bottomToast.style.scale = '100%'; bottomToast.style.transform = 'translateY(0px)';
+                        } else {
+                            bottomToast.style.scale = '88%';
+                            if(this.position.includes('bottom')){ bottomToast.style.transform = 'translateY(-32px)'; }
+                            else { this.alignBottom(topToast, bottomToast); bottomToast.style.transform = 'translateY(32px)'; }
+                        }
+
+                        if(this.toasts.length == 3) return;
+                        let burnToast = document.getElementById( this.toasts[3].id );
+                         if (!burnToast) return;
+                        burnToast.style.zIndex = 70;
+                        let burnToastPosition;
+                        if(this.expanded){
+                            burnToastPosition = topToast.getBoundingClientRect().height + this.paddingBetweenToasts + middleToast.getBoundingClientRect().height + this.paddingBetweenToasts + bottomToast.getBoundingClientRect().height + this.paddingBetweenToasts + 'px';
+                            if(this.position.includes('bottom')){ burnToast.style.top = 'auto'; burnToast.style.bottom = burnToastPosition; }
+                            else { burnToast.style.top = burnToastPosition; }
+                            burnToast.style.scale = '100%'; burnToast.style.transform = 'translateY(0px)';
+                        } else {
+                            burnToast.style.scale = '82%';
+                            if (topToast && burnToast) this.alignBottom(topToast, burnToast);
+                            burnToast.style.transform = 'translateY(48px)';
+                        }
+                        if (burnToast.firstElementChild) {
+                            burnToast.firstElementChild.classList.remove('opacity-100');
+                            burnToast.firstElementChild.classList.add('opacity-0');
+                        }
+                        let that = this;
+                        setTimeout(function(){ that.toasts.pop(); }, 300);
+                        return;
+                    },
+                    alignBottom(element1, element2) { if (!element1 || !element2) return; let top1 = element1.offsetTop; let height1 = element1.offsetHeight; let height2 = element2.offsetHeight; let top2 = top1 + (height1 - height2); element2.style.top = top2 + 'px'; },
+                    alignTop(element1, element2) { if (!element1 || !element2) return; let top1 = element1.offsetTop; element2.style.top = top1 + 'px'; },
+                    resetBottom(){ for(let i = 0; i < this.toasts.length; i++){ if(document.getElementById( this.toasts[i].id )){ let toastElement = document.getElementById( this.toasts[i].id ); toastElement.style.bottom = '0px'; } } },
+                    resetTop(){ for(let i = 0; i < this.toasts.length; i++){ if(document.getElementById( this.toasts[i].id )){ let toastElement = document.getElementById( this.toasts[i].id ); toastElement.style.top = '0px'; } } },
+                    getBottomPositionOfElement(el){ if (!el) return 0; return (el.getBoundingClientRect().height + el.getBoundingClientRect().top); },
+                    calculateHeightOfToastsContainer(){
+                        if(this.toasts.length == 0){ $el.style.height = '0px'; return; }
+                        let lastToast = this.toasts[this.toasts.length - 1];
+                        let lastToastElement = document.getElementById(lastToast.id);
+                        if (!lastToastElement) { $el.style.height = '0px'; return; }
+                        let lastToastRectangle = lastToastElement.getBoundingClientRect();
+
+                        let firstToast = this.toasts[0];
+                        let firstToastElement = document.getElementById(firstToast.id);
+                         if (!firstToastElement) { $el.style.height = '0px'; return; }
+                        let firstToastRectangle = firstToastElement.getBoundingClientRect();
+
+                        if(this.toastsHovered){
+                            if(this.position.includes('bottom')){ $el.style.height = ((firstToastRectangle.top + firstToastRectangle.height) - lastToastRectangle.top) + 'px'; }
+                            else { $el.style.height = ((lastToastRectangle.top + lastToastRectangle.height) - firstToastRectangle.top) + 'px'; }
+                        } else { $el.style.height = firstToastRectangle.height + 'px'; }
+                    }
+                }"
+                @set-toasts-layout.window=" layout=event.detail.layout; if(layout == 'expanded'){ expanded=true; } else { expanded=false; } stackToasts(); "
+                @toast-show.window=" event.stopPropagation(); if(event.detail.position){ position = event.detail.position; } toasts.unshift({ id: 'toast-' + Math.random().toString(16).slice(2), show: false, message: event.detail.message, description: event.detail.description, type: event.detail.type, html: event.detail.html }); "
+                @mouseenter="toastsHovered=true;"
+                @mouseleave="toastsHovered=false"
+                x-init=" if(layout == 'expanded'){ expanded = true; } stackToasts(); $watch('toastsHovered', function(value){ if(layout == 'default'){ if(position.includes('bottom')){ resetBottom(); } else { resetTop(); } if(value){ expanded = true; if(layout == 'default'){ stackToasts(); } } else { if(layout == 'default'){ expanded = false; setTimeout(function(){ stackToasts(); }, 10); } } } }); "
+                class="fixed block w-full group z-[99] sm:max-w-xs"
+                :class="{ 'right-0 top-0 sm:mt-6 sm:mr-6': position=='top-right', 'left-0 top-0 sm:mt-6 sm:ml-6': position=='top-left', 'left-1/2 -translate-x-1/2 top-0 sm:mt-6': position=='top-center', 'right-0 bottom-0 sm:mr-6 sm:mb-6': position=='bottom-right', 'left-0 bottom-0 sm:ml-6 sm:mb-6': position=='bottom-left', 'left-1/2 -translate-x-1/2 bottom-0 sm:mb-6': position=='bottom-center' }"
+                x-cloak>
+
+                <template x-for="(toast, index) in toasts" :key="toast.id">
+                    <li
+                        :id="toast.id"
+                        x-data="{ toastHovered: false }"
+                        x-init="
+                            let el = $el;
+                            if(position.includes('bottom')){ el.firstElementChild.classList.add('toast-bottom'); el.firstElementChild.classList.add('opacity-0', 'translate-y-full'); }
+                            else { el.firstElementChild.classList.add('opacity-0', '-translate-y-full'); }
+                            setTimeout(function(){
+                                setTimeout(function(){
+                                    if(el.firstElementChild){
+                                        if(position.includes('bottom')){ el.firstElementChild.classList.remove('opacity-0', 'translate-y-full'); }
+                                        else { el.firstElementChild.classList.remove('opacity-0', '-translate-y-full'); }
+                                        el.firstElementChild.classList.add('opacity-100', 'translate-y-0');
+                                    }
+                                    setTimeout(function(){ stackToasts(); }, 10);
+                                }, 5);
+                            }, 50);
+                            setTimeout(function(){
+                                if (!toastHovered) {
+                                    setTimeout(function(){
+                                        if(el.firstElementChild){
+                                            el.firstElementChild.classList.remove('opacity-100');
+                                            el.firstElementChild.classList.add('opacity-0');
+                                            if(toasts.length == 1){
+                                                el.firstElementChild.classList.remove('translate-y-0');
+                                                if(position.includes('bottom')){ el.firstElementChild.classList.add('translate-y-full'); }
+                                                else { el.firstElementChild.classList.add('-translate-y-full'); }
+                                            }
+                                        }
+                                        setTimeout(function(){ deleteToastWithId(toast.id); }, 300);
+                                    }, 5);
+                                }
+                            }, 4000);
+                        "
+                        @mouseover="toastHovered=true"
+                        @mouseout="toastHovered=false"
+                        class="absolute w-full duration-300 ease-out select-none sm:max-w-xs transition-all"
+                        :class="{ 'toast-no-description': !toast.description }"
+                        >
+                        <span
+                            class="relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full transition-all duration-300 ease-out bg-white border border-gray-100 sm:rounded-md sm:max-w-xs group"
+                            :class="{ 'p-4' : !toast.html, 'p-0' : toast.html }"
+                        >
+                            <template x-if="!toast.html">
+                                <div class="relative">
+                                    <div class="flex items-center"
+                                        :class="{ 'text-green-500' : toast.type=='success', 'text-blue-500' : toast.type=='info', 'text-orange-400' : toast.type=='warning', 'text-red-500' : toast.type=='danger', 'text-gray-800' : toast.type=='default' }">
+                                        <svg x-show="toast.type=='success'" class="w-[18px] h-[18px] mr-1.5 -ml-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM16.7744 9.63269C17.1238 9.20501 17.0604 8.57503 16.6327 8.22559C16.2051 7.87615 15.5751 7.93957 15.2256 8.36725L10.6321 13.9892L8.65936 12.2524C8.24484 11.8874 7.61295 11.9276 7.248 12.3421C6.88304 12.7566 6.92322 13.3885 7.33774 13.7535L9.31046 15.4903C10.1612 16.2393 11.4637 16.1324 12.1808 15.2547L16.7744 9.63269Z" fill="currentColor"></path></svg>
+                                        <svg x-show="toast.type=='info'" class="w-[18px] h-[18px] mr-1.5 -ml-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM12 9C12.5523 9 13 8.55228 13 8C13 7.44772 12.5523 7 12 7C11.4477 7 11 7.44772 11 8C11 8.55228 11.4477 9 12 9ZM13 12C13 11.4477 12.5523 11 12 11C11.4477 11 11 11.4477 11 12V16C11 16.5523 11.4477 17 12 17C12.5523 17 13 16.5523 13 16V12Z" fill="currentColor"></path></svg>
+                                        <svg x-show="toast.type=='warning'" class="w-[18px] h-[18px] mr-1.5 -ml-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M9.44829 4.46472C10.5836 2.51208 13.4105 2.51168 14.5464 4.46401L21.5988 16.5855C22.7423 18.5509 21.3145 21 19.05 21L4.94967 21C2.68547 21 1.25762 18.5516 2.4004 16.5862L9.44829 4.46472ZM11.9995 8C12.5518 8 12.9995 8.44772 12.9995 9V13C12.9995 13.5523 12.5518 14 11.9995 14C11.4473 14 10.9995 13.5523 10.9995 13V9C10.9995 8.44772 11.4473 8 11.9995 8ZM12.0009 15.99C11.4486 15.9892 11.0003 16.4363 10.9995 16.9886L10.9995 16.9986C10.9987 17.5509 11.4458 17.9992 11.9981 18C12.5504 18.0008 12.9987 16.5537 12.9995 17.0014L12.9995 16.9914C13.0003 15.4391 12.5532 14.9908 12.001 14.99Z" fill="currentColor"></path></svg>
+                                        <svg x-show="toast.type=='danger'" class="w-[18px] h-[18px] mr-1.5 -ml-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12ZM11.9996 7C12.5519 7 12.9996 7.44772 12.9996 8V12C12.9996 12.5523 12.5519 13 11.9996 13C11.4474 13 10.9996 12.5523 10.9996 12V8C10.9996 7.44772 11.4474 7 11.9996 7ZM12.001 14.99C11.4488 14.9892 11.0004 15.4363 10.9997 15.9886L10.9996 15.9986C10.9989 16.5509 11.446 16.9992 11.9982 17C12.5505 17.0008 12.9989 16.5537 12.9996 16.0014L12.9996 15.9914C13.0004 15.4391 12.5533 14.9908 12.001 14.99Z" fill="currentColor"></path></svg>
+                                        <p class="text-[13px] font-medium leading-none text-gray-800" x-text="toast.message"></p>
+                                    </div>
+                                    <p x-show="toast.description" :class="{ 'pl-5' : toast.type!='default' }" class="mt-1.5 text-xs leading-none opacity-70" x-text="toast.description"></p>
+                                </div>
+                            </template>
+                            <template x-if="toast.html"> <div x-html="toast.html"></div> </template>
+                             <span
+                                @click="burnToast(toast.id)"
+                                class="absolute right-0 p-1 text-white bg-red-500 rounded-full opacity-0 cursor-pointer hover:bg-red-600 transition-colors duration-150 flex items-center justify-center w-5 h-5"
+                                :class="{ 'top-1/2 -translate-y-1/2 mr-2' : !toast.description && !toast.html, 'top-1.5 right-1.5' : (toast.description || toast.html), 'opacity-100' : toastHovered || toastsHovered, 'opacity-0' : !toastHovered && !toastsHovered }">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                            </span>
+                        </span>
+                    </li>
+                </template>
+            </ul>
+        </template>
+    </div>
+    <div class="max-w-7xl mx-auto bg-white p-4 md:p-6 lg:p-8 rounded-lg shadow-md">
+        <h1 class="text-xl md:text-2xl lg:text-3xl font-bold mb-6 text-center text-gray-700">Input Data Skor Benchmark Model</h1>
+
+        <div class="lg:flex lg:gap-8">
+
+            <div class="lg:w-4/12 space-y-6 mb-8 lg:mb-0">
+                <form id="dataForm" class="space-y-6">
+                    <div class="border p-4 rounded-md bg-gray-50">
+                        <h2 class="text-base md:text-lg font-semibold mb-3 text-gray-600">1. Definisikan Parameter (Benchmark)</h2>
+                        <p class="text-xs md:text-sm text-gray-500 mb-3">Anda bisa mengubah urutan parameter dengan drag & drop ikon <span class="font-mono">☰</span>.</p>
+                        <div id="parameterContainer" class="space-y-2 mb-3">
+                            <div class="parameter-input-group" draggable="true" data-param-id="param_initial_0">
+                                <span class="drag-handle">☰</span>
+                                <input type="text" name="parameterName_param_initial_0" placeholder="Nama Parameter (cth: AIME 2024)" class="parameter-name p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" required oninput="handleParameterNameInput(this)">
+                                <button type="button" class="remove-btn remove-parameter-btn" onclick="removeInputGroup(this, '#parameterContainer', '.parameter-input-group', updateModelInputs)" title="Hapus Parameter">X</button>
+                            </div>
+                        </div>
+                         <button type="button" id="addParameterBtn" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200 text-sm md:text-base">Tambah Parameter</button>
+                    </div>
+
+                    <div class="border p-4 rounded-md bg-gray-50">
+                         <h2 class="text-base md:text-lg font-semibold mb-3 text-gray-600">2. Input Model dan Skornya</h2>
+                         <p id="editModeInfo" class="text-sm text-blue-600 mb-3 hidden">Anda sedang mengedit data. Klik "Batal Edit" untuk kembali menambah data baru.</p>
+                        <div id="modelContainer" class="space-y-4">
+                             <div class="model-input-group" data-model-id="model_initial_0">
+                                <div class="model-name-row">
+                                    <input type="text" name="modelName[]" placeholder="Nama Model (cth: Claude 3.7)" class="model-name p-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                    <button type="button" class="remove-btn remove-model-btn" onclick="removeInputGroup(this, '#modelContainer', '.model-input-group')" title="Hapus Model">X</button>
+                                </div>
+                                <div class="scores-container"> </div>
+                            </div>
+                        </div>
+                         <button type="button" id="addModelBtn" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200 mt-3 text-sm md:text-base">Tambah Model</button>
+                    </div>
+
+                    <div class="flex flex-wrap gap-4">
+                        <button type="button" id="generateChartBtn" class="flex-1 basis-full sm:basis-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200 text-sm md:text-base">
+                            Buat Grafik
+                        </button>
+                         <button type="button" id="cancelEditBtn" class="hidden flex-1 basis-full sm:basis-auto bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200 text-sm md:text-base">
+                            Batal Edit
+                        </button>
+                         <button type="button" id="resetChartBtn" class="flex-1 basis-full sm:basis-auto bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200 text-sm md:text-base">
+                            Reset Grafik
+                        </button>
+                         <button type="button" id="viewHistoryBtn" class="flex-1 basis-full sm:basis-auto bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200 text-sm md:text-base">
+                            Lihat Histori
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="lg:w-8/12">
+                <div class="sticky top-8">
+                     <h2 class="text-lg md:text-xl font-semibold mb-4 text-center text-gray-600">Grafik Perbandingan Skor</h2>
+                    <div id="chartContainer"> </div>
+                    <div id="summaryTableContainer" class="mt-8">
+                        <div id="summaryTable">
+                            </div>
+                    </div>
+                </div>
+            </div>
+
+        </div> </div>
+
+    <div id="historyModal" class="modal-overlay hidden">
+        <div class="modal-content relative">
+            <button id="closeHistoryModalBtn" class="modal-close-btn" title="Tutup">&times;</button>
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Histori Benchmark</h2>
+            <div id="historyList" class="space-y-2">
+                 <div class="flex flex-col justify-center items-center h-32">
+                    <div class="loader mb-4"></div>
+                    <p class="shimmer-text text-gray-500 text-sm">Memuat data histori...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="deleteConfirmModal" class="modal-overlay hidden">
+        <div class="modal-content relative">
+             <button id="closeDeleteConfirmModalBtn" class="modal-close-btn" title="Tutup">&times;</button>
+             <h3 class="text-lg font-semibold mb-3 text-gray-700">Konfirmasi Hapus</h3>
+             <p id="deleteConfirmMessage" class="text-gray-600 mb-4">Apakah Anda yakin ingin menghapus data histori ini?</p>
+             <div class="confirm-buttons">
+                 <button id="cancelDeleteBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-md transition duration-200">
+                     Batal
+                 </button>
+                 <button id="confirmDeleteBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200">
+                     Ya, Hapus
+                 </button>
+             </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Fungsi Global untuk Toast (Sudah didefinisikan di dalam x-init di body) ---
+
+        // --- Variabel Global Lainnya ---
+        const parameterContainer = document.getElementById('parameterContainer');
+        const modelContainer = document.getElementById('modelContainer');
+        const addParameterBtn = document.getElementById('addParameterBtn');
+        const addModelBtn = document.getElementById('addModelBtn');
+        const generateChartBtn = document.getElementById('generateChartBtn'); // Tombol utama
+        const viewHistoryBtn = document.getElementById('viewHistoryBtn');
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+        const resetChartBtn = document.getElementById('resetChartBtn');
+        const editModeInfo = document.getElementById('editModeInfo');
+        const chartContainerDiv = document.getElementById('chartContainer');
+        const summaryTableContainer = document.getElementById('summaryTableContainer');
+        const historyModal = document.getElementById('historyModal');
+        const closeHistoryModalBtn = document.getElementById('closeHistoryModalBtn');
+        const historyListDiv = document.getElementById('historyList');
+        const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+        const deleteConfirmMessage = document.getElementById('deleteConfirmMessage');
+        const cancelDeleteBtnModal = document.getElementById('cancelDeleteBtn');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        // *** BARU: Referensi tombol tutup modal delete ***
+        const closeDeleteConfirmModalBtn = document.getElementById('closeDeleteConfirmModalBtn');
+        let fusionChartInstance = null;
+        let draggedItem = null;
+        let dropTargetIndicator = null;
+        let db = null;
+        let historicalDataCache = {};
+        let docIdToDelete = null;
+        let isEditMode = false;
+        let editingDocId = null;
+
+        // --- KONFIGURASI FIREBASE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyA4veyYHQo-IUAJyctRvpsp-eAKoSlbnJ4",
+            authDomain: "comparison-llm-scores.firebaseapp.com",
+            projectId: "comparison-llm-scores",
+            storageBucket: "comparison-llm-scores.appspot.com",
+            messagingSenderId: "1076662003447",
+            appId: "1:1076662003447:web:0e1a8766ddf3e6301755f2",
+            measurementId: "G-KGKG21BFWH"
+        };
+        // --- AKHIR KONFIGURASI FIREBASE ---
+
+        // Inisialisasi Firebase
+        function initializeFirebase() {
+             try {
+                const isConfigPlaceholder = !firebaseConfig.projectId || !firebaseConfig.apiKey || firebaseConfig.projectId.startsWith("GANTI_") || firebaseConfig.apiKey.startsWith("GANTI_");
+                if (isConfigPlaceholder) {
+                    window.toast('Konfigurasi Firebase Dibutuhkan!', { description: 'Masukkan konfigurasi Firebase Anda di kode JavaScript untuk mengaktifkan penyimpanan dan histori.', type: 'warning', position: 'top-center' });
+                    throw new Error("Konfigurasi Firebase belum lengkap.");
+                } else {
+                    firebase.initializeApp(firebaseConfig);
+                    db = firebase.firestore();
+                    console.log("Firebase berhasil diinisialisasi.");
+                    // Aktifkan tombol utama & histori
+                    generateChartBtn.disabled = false; generateChartBtn.title = ""; generateChartBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    viewHistoryBtn.disabled = false; viewHistoryBtn.title = ""; viewHistoryBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                     // Aktifkan tombol reset grafik (default state)
+                    resetChartBtn.disabled = false; resetChartBtn.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error("Gagal menginisialisasi Firebase:", error);
+                window.toast('Error Inisialisasi Firebase!', { description: `Gagal menginisialisasi Firebase: ${error.message}. Penyimpanan & Histori tidak akan berfungsi.`, type: 'danger', position: 'top-center' });
+                // Nonaktifkan tombol utama & histori
+                generateChartBtn.disabled = true; generateChartBtn.title = "Inisialisasi Firebase gagal."; generateChartBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                viewHistoryBtn.disabled = true; viewHistoryBtn.title = "Inisialisasi Firebase gagal."; viewHistoryBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                 // Sembunyikan tombol reset jika init gagal
+                resetChartBtn.classList.add('hidden');
+            }
+        }
+        // Panggil init setelah Alpine siap (event listener di bawah)
+
+        // --- Fungsi Utilitas ---
+        function generateUniqueId(prefix = 'id') {
+             return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        }
+        function formatFirestoreTimestamp(timestamp) {
+            if (timestamp && typeof timestamp.toDate === 'function') {
+                try {
+                    const date = timestamp.toDate();
+                    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+                    return date.toLocaleDateString('id-ID', options);
+                } catch (error) {
+                    console.error("Error formatting timestamp:", error, "Input:", timestamp);
+                    return 'Error Format Timestamp';
+                }
+            }
+            console.warn("formatFirestoreTimestamp received invalid or non-Timestamp input:", timestamp);
+            return 'Timestamp tidak valid';
+        }
+
+
+        // --- Fungsi Pengelolaan Input ---
+        function clearFormInputs() {
+             const paramGroups = parameterContainer.querySelectorAll('.parameter-input-group');
+             paramGroups.forEach((group, index) => { if (index > 0) group.remove(); else { group.dataset.paramId = generateUniqueId('param'); const input = group.querySelector('.parameter-name'); if (input) input.value = ''; } });
+             if (parameterContainer.children.length === 0) addParameterInput();
+             const modelGroups = modelContainer.querySelectorAll('.model-input-group');
+             modelGroups.forEach((group, index) => { if (index > 0) group.remove(); else { group.dataset.modelId = generateUniqueId('model'); const input = group.querySelector('.model-name'); if (input) input.value = ''; const scoresContainer = group.querySelector('.scores-container'); if (scoresContainer) scoresContainer.innerHTML = ''; } });
+             if (modelContainer.children.length === 0) addModelInput();
+             updateModelInputs();
+             updateRemoveButtons('#parameterContainer', '.parameter-input-group');
+             updateRemoveButtons('#modelContainer', '.model-input-group');
+             // Kosongkan juga tabel kesimpulan
+             if (summaryTableContainer) {
+                 summaryTableContainer.innerHTML = '<div id="summaryTable"></div>'; // Reset ke placeholder
+             }
+        }
+        function removeInputGroup(button, containerSelector, groupSelector, callback = null) {
+            const container = document.querySelector(containerSelector);
+            if (container.querySelectorAll(groupSelector).length > 1) {
+                const groupToRemove = button.closest(groupSelector);
+                if (groupToRemove) {
+                    groupToRemove.remove();
+                    if (callback) { setTimeout(callback, 0); }
+                    updateRemoveButtons(containerSelector, groupSelector);
+                }
+            } else {
+                window.toast('Input Error', { description: `Minimal harus ada satu ${groupSelector.includes('parameter') ? 'parameter' : 'model'}.`, type: 'danger', position: 'top-right' });
+            }
+        }
+        function updateRemoveButtons(containerSelector, groupSelector) {
+            const container = document.querySelector(containerSelector);
+            const groups = container.querySelectorAll(groupSelector);
+            const disableRemove = groups.length <= 1;
+            groups.forEach(group => {
+                const removeButton = group.querySelector(groupSelector.includes('parameter') ? '.remove-parameter-btn' : '.remove-model-btn');
+                if (removeButton) {
+                    removeButton.disabled = disableRemove;
+                    removeButton.classList.toggle('opacity-50', disableRemove);
+                    removeButton.classList.toggle('cursor-not-allowed', disableRemove);
+                }
+            });
+        }
+        function addParameterInput(initialValue = '', existingParamId = null) {
+            const paramId = existingParamId || generateUniqueId('param');
+            const newInputGroup = document.createElement('div');
+            newInputGroup.className = 'parameter-input-group';
+            newInputGroup.setAttribute('draggable', 'true');
+            newInputGroup.dataset.paramId = paramId;
+            newInputGroup.innerHTML = `
+                <span class="drag-handle">☰</span>
+                <input type="text" name="parameterName_${paramId}" placeholder="Nama Parameter" class="parameter-name p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" required oninput="handleParameterNameInput(this)" value="${initialValue}">
+                <button type="button" class="remove-btn remove-parameter-btn" onclick="removeInputGroup(this, '#parameterContainer', '.parameter-input-group', updateModelInputs)" title="Hapus Parameter">X</button>
+            `;
+            parameterContainer.appendChild(newInputGroup);
+            addDragDropListeners(newInputGroup);
+            updateRemoveButtons('#parameterContainer', '.parameter-input-group');
+            updateModelInputs();
+            return newInputGroup;
+        }
+        function addModelInput(initialValue = '', existingModelId = null) {
+            const modelId = existingModelId || generateUniqueId('model');
+            const newInputGroup = document.createElement('div');
+            newInputGroup.className = 'model-input-group';
+            newInputGroup.dataset.modelId = modelId;
+            newInputGroup.innerHTML = `
+                <div class="model-name-row">
+                    <input type="text" name="modelName[]" placeholder="Nama Model" class="model-name p-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required value="${initialValue}">
+                    <button type="button" class="remove-btn remove-model-btn" onclick="removeInputGroup(this, '#modelContainer', '.model-input-group')" title="Hapus Model">X</button>
+                </div>
+                <div class="scores-container"></div>`;
+            modelContainer.appendChild(newInputGroup);
+            updateModelInputsForGroup(newInputGroup, null);
+            updateRemoveButtons('#modelContainer', '.model-input-group');
+            return newInputGroup;
+        }
+        // Update semua input skor di semua model
+        function updateModelInputs() {
+            const modelGroups = modelContainer.querySelectorAll('.model-input-group');
+            const paramIdToNameMap = {};
+            parameterContainer.querySelectorAll('.parameter-input-group').forEach(pg => {
+                const id = pg.dataset.paramId;
+                const input = pg.querySelector('.parameter-name');
+                if (id && input) {
+                    paramIdToNameMap[id] = input.value.trim() || 'Parameter';
+                }
+            });
+            modelGroups.forEach(modelGroup => updateModelInputsForGroup(modelGroup, null, paramIdToNameMap));
+            updateRemoveButtons('#parameterContainer', '.parameter-input-group');
+        }
+
+        // Update input skor untuk satu grup model
+        function updateModelInputsForGroup(modelGroup, scoresData = null, paramIdToNameMap = null) {
+            const scoresContainer = modelGroup.querySelector('.scores-container');
+            if (!scoresContainer) return;
+            const modelId = modelGroup.dataset.modelId;
+
+            if (!paramIdToNameMap) {
+                paramIdToNameMap = {};
+                parameterContainer.querySelectorAll('.parameter-input-group').forEach(pg => {
+                    const id = pg.dataset.paramId;
+                    const input = pg.querySelector('.parameter-name');
+                    if (id && input) {
+                        paramIdToNameMap[id] = input.value.trim() || 'Parameter';
+                    }
+                });
+            }
+
+            const existingScores = {};
+            scoresContainer.querySelectorAll('.score-value').forEach(input => {
+                const paramId = input.dataset.paramId;
+                if (paramId) {
+                    existingScores[paramId] = input.value;
+                }
+            });
+
+            scoresContainer.innerHTML = '';
+            const parameterGroups = parameterContainer.querySelectorAll('.parameter-input-group');
+            parameterGroups.forEach((paramGroup) => {
+                const paramId = paramGroup.dataset.paramId;
+                if (!paramId) return;
+
+                const paramName = paramIdToNameMap[paramId] || 'Parameter';
+                const scoreInputDiv = document.createElement('div');
+                scoreInputDiv.className = 'score-input-group';
+                const inputId = `score_${modelId}_${paramId}`;
+                scoreInputDiv.innerHTML = `
+                    <label for="${inputId}" class="block text-center" title="${paramName}">${paramName}</label>
+                    <input type="number" step="any" id="${inputId}" name="score_${paramId}[]" data-param-id="${paramId}" placeholder="Skor" min="0" max="100" class="score-value p-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>`;
+
+                const scoreInput = scoreInputDiv.querySelector('input');
+                if (scoresData && scoresData[paramName] !== undefined) {
+                    scoreInput.value = scoresData[paramName];
+                } else if (existingScores[paramId] !== undefined) {
+                    scoreInput.value = existingScores[paramId];
+                }
+                scoresContainer.appendChild(scoreInputDiv);
+            });
+        }
+        // Update label skor saat nama parameter diubah
+        function handleParameterNameInput(parameterInput) {
+            const parameterGroup = parameterInput.closest('.parameter-input-group');
+            if (!parameterGroup) return;
+            const paramId = parameterGroup.dataset.paramId;
+            const newName = parameterInput.value.trim() || 'Parameter';
+            if (!paramId) { console.error("Parameter ID tidak ditemukan untuk input:", parameterInput); return; }
+
+            const modelGroups = modelContainer.querySelectorAll('.model-input-group');
+            modelGroups.forEach(modelGroup => {
+                const scoreInput = modelGroup.querySelector(`.score-value[data-param-id="${paramId}"]`);
+                if (scoreInput) {
+                    const scoreLabel = modelGroup.querySelector(`label[for="${scoreInput.id}"]`);
+                    if (scoreLabel) {
+                        scoreLabel.textContent = newName;
+                        scoreLabel.title = newName;
+                    }
+                }
+            });
+        }
+
+        // --- Fungsi Drag and Drop ---
+        function addDragDropListeners(element) { element.addEventListener('dragstart', handleDragStart); element.addEventListener('dragover', handleDragOver); element.addEventListener('dragenter', handleDragEnter); element.addEventListener('dragleave', handleDragLeave); element.addEventListener('drop', handleDrop); element.addEventListener('dragend', handleDragEnd); }
+        function handleDragStart(e) { draggedItem = this; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', this.dataset.paramId); setTimeout(() => { if (draggedItem) draggedItem.classList.add('dragging'); }, 0); }
+        function handleDragOver(e) { e.preventDefault(); if (!draggedItem || this === draggedItem) return; const targetRect = this.getBoundingClientRect(); const dropY = e.clientY; const isAfter = dropY > targetRect.top + targetRect.height / 2; clearDropIndicator(); this.classList.add('drag-over-target'); this.classList.toggle('drop-after', isAfter); dropTargetIndicator = this; }
+        function handleDragEnter(e) { e.preventDefault(); }
+        function handleDragLeave(e) { if (!this.contains(e.relatedTarget) && dropTargetIndicator === this) { clearDropIndicator(); } }
+        function handleDrop(e) { e.preventDefault(); e.stopPropagation(); if (!draggedItem || draggedItem === this) { clearDropIndicator(); return; } const targetRect = this.getBoundingClientRect(); const dropY = e.clientY; const isAfter = dropY > targetRect.top + targetRect.height / 2; if (isAfter) { this.parentNode.insertBefore(draggedItem, this.nextSibling); } else { this.parentNode.insertBefore(draggedItem, this); } clearDropIndicator(); setTimeout(updateModelInputs, 0); }
+        function handleDragEnd(e) { if (draggedItem) { draggedItem.classList.remove('dragging'); } clearDropIndicator(); draggedItem = null; }
+        function clearDropIndicator() { const indicators = parameterContainer.querySelectorAll('.drag-over-target'); indicators.forEach(el => { el.classList.remove('drag-over-target', 'drop-after'); }); dropTargetIndicator = null; }
+        parameterContainer.querySelectorAll('.parameter-input-group').forEach(addDragDropListeners); // Tambahkan listener ke elemen awal
+
+        // --- Fungsi Pengelolaan Grafik & Penyimpanan ---
+
+        // Mempersiapkan data dari form untuk grafik dan Firestore
+        function prepareChartData() {
+            let isValid = true;
+            const data = {
+                parameterNames: [], // Array nama parameter (sesuai urutan DOM)
+                parameterIds: [],   // Array ID parameter (untuk referensi internal) -> DIPERLUKAN UNTUK GRAFIK
+                models: [],          // Array objek model
+                entryName: null // Field untuk nama histori
+            };
+
+            // 1. Kumpulkan Parameter (Nama dan ID)
+            const parameterGroups = parameterContainer.querySelectorAll('.parameter-input-group');
+            if (parameterGroups.length === 0) { window.toast('Input Error', { description: 'Harap tambahkan setidaknya satu parameter.', type: 'danger', position: 'top-right' }); return null; }
+
+            const parameterNameSet = new Set(); // Cek duplikasi nama parameter
+            parameterGroups.forEach((group, index) => {
+                const input = group.querySelector('.parameter-name');
+                const paramId = group.dataset.paramId;
+                const name = input ? input.value.trim() : '';
+
+                if (input) input.classList.remove('border-red-500'); // Reset border error
+
+                if (!name) { // Validasi nama tidak kosong
+                    window.toast('Input Error', { description: `Nama parameter ke-${index + 1} tidak boleh kosong.`, type: 'danger', position: 'top-right' });
+                    if (input) input.classList.add('border-red-500');
+                    isValid = false;
+                } else if (parameterNameSet.has(name)) { // Validasi nama unik
+                     window.toast('Input Error', { description: `Nama parameter "${name}" duplikat. Nama parameter harus unik.`, type: 'danger', position: 'top-right' });
+                     if (input) input.classList.add('border-red-500');
+                     isValid = false;
+                } else {
+                    parameterNameSet.add(name);
+                }
+
+                if (!paramId) { // Validasi ID ada
+                    console.error(`Parameter group ke-${index+1} tidak memiliki data-param-id.`);
+                    window.toast('Kesalahan Internal', { description: `ID parameter hilang.`, type: 'danger', position: 'top-right' });
+                    isValid = false;
+                }
+                data.parameterNames.push(name);
+                data.parameterIds.push(paramId); // Simpan ID untuk referensi grafik
+            });
+            if (!isValid) return null;
+
+            // 2. Kumpulkan Model dan Skornya
+            const modelGroups = modelContainer.querySelectorAll('.model-input-group');
+            if (modelGroups.length === 0) { window.toast('Input Error', { description: 'Harap tambahkan setidaknya satu model.', type: 'danger', position: 'top-right' }); return null; }
+
+            modelGroups.forEach((group, modelIndex) => {
+                const modelNameInput = group.querySelector('.model-name');
+                const modelName = modelNameInput ? modelNameInput.value.trim() : '';
+                const scores = {}; // Objek skor { namaParameter: skor }
+
+                if (modelNameInput) modelNameInput.classList.remove('border-red-500'); // Reset border error
+                if (!modelName) { // Validasi nama model
+                    window.toast('Input Error', { description: `Nama model ke-${modelIndex + 1} tidak boleh kosong.`, type: 'danger', position: 'top-right' });
+                    if (modelNameInput) modelNameInput.classList.add('border-red-500');
+                    isValid = false;
+                }
+
+                // Iterasi berdasarkan parameter yang sudah dikumpulkan
+                data.parameterIds.forEach((paramId, paramIndex) => {
+                    const paramName = data.parameterNames[paramIndex]; // Ambil nama parameter
+                    const scoreInput = group.querySelector(`input.score-value[data-param-id="${paramId}"]`); // Cari input skor berdasarkan ID
+
+                    if (!scoreInput) {
+                        console.error(`Input skor untuk paramId ${paramId} tidak ditemukan di model ${modelName}`);
+                        window.toast('Kesalahan Internal', { description: `Input skor hilang untuk model ${modelName}.`, type: 'danger', position: 'top-right' });
+                        isValid = false;
+                        return;
+                    }
+
+                    const scoreValue = scoreInput.value;
+                    const score = parseFloat(scoreValue);
+                    scoreInput.classList.remove('border-red-500'); // Reset border error
+
+                    if (scoreValue === '' || isNaN(score) || score < 0 || score > 100) { // Validasi skor
+                        window.toast('Input Error', { description: `Skor untuk "${modelName}" pada parameter "${paramName}" harus angka antara 0 dan 100.`, type: 'danger', position: 'top-right' });
+                        scoreInput.classList.add('border-red-500');
+                        isValid = false;
+                    }
+                    // Gunakan nama parameter sebagai kunci
+                    scores[paramName] = score;
+                });
+
+                if (isValid) { // Tambahkan model jika valid
+                    data.models.push({ name: modelName, scores: scores });
+                }
+            });
+
+            if (!isValid) return null;
+
+            // Tambahkan timestamp dan nama default jika bukan mode edit
+            if (!isEditMode) {
+                // Timestamp
+                if (firebase && firebase.firestore && firebase.firestore.FieldValue) {
+                    data.timestamp = firebase.firestore.FieldValue.serverTimestamp();
+                } else {
+                    console.error("Firebase Firestore atau FieldValue tidak tersedia untuk membuat server timestamp.");
+                    data.timestamp = new Date(); // Fallback
+                }
+                // Nama histori default
+                const firstModelName = data.models.length > 0 ? data.models[0].name : 'Data';
+                const date = new Date();
+                const defaultEntryName = `${firstModelName} - ${date.toLocaleDateString('id-ID')} ${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+                data.entryName = defaultEntryName;
+
+            } else if (editingDocId && historicalDataCache[editingDocId]) {
+                 // Jika mode edit, pertahankan nama histori dan timestamp yang ada dari cache
+                 data.entryName = historicalDataCache[editingDocId].entryName;
+                 data.timestamp = historicalDataCache[editingDocId].timestamp;
+            }
+
+            // Jangan hapus parameterIds di sini, masih dibutuhkan oleh generateChartFromData
+            console.log("Data siap untuk grafik:", JSON.stringify(data, null, 2));
+            return data;
+         }
+
+        // Menyimpan data baru ke Firestore
+        async function saveDataToFirestore(dataToSave) { // dataToSave masih memiliki parameterIds
+            if (!db) { window.toast('Firestore Error', { description: 'Firestore tidak terinisialisasi. Tidak dapat menyimpan data.', type: 'danger', position: 'top-center' }); return; }
+            window.toast('Menyimpan...', { description: 'Menyimpan data ke Firebase...', type: 'info', position: 'top-center' });
+
+            // Gunakan shallow copy untuk data storage dan hapus ID internal
+            const dataForStorage = { ...dataToSave };
+            delete dataForStorage.parameterIds;
+            // Pastikan timestamp sentinel ada
+            if (!dataForStorage.timestamp && firebase && firebase.firestore && firebase.firestore.FieldValue) {
+                console.warn("Timestamp sentinel tidak ditemukan di dataToSave, menambahkan kembali.");
+                dataForStorage.timestamp = firebase.firestore.FieldValue.serverTimestamp();
+            } else if (!dataForStorage.timestamp) { // Jika FieldValue tidak ada, gunakan Date object
+                 console.warn("Firebase FieldValue tidak tersedia, menggunakan timestamp klien.");
+                 dataForStorage.timestamp = new Date();
+            }
+            // Pastikan nama histori ada
+            if (!dataForStorage.entryName) {
+                 const firstModelName = dataForStorage.models.length > 0 ? dataForStorage.models[0].name : 'Data';
+                 const date = new Date();
+                 dataForStorage.entryName = `${firstModelName} - ${date.toLocaleDateString('id-ID')} ${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+                 console.warn("Nama histori tidak ada, membuat default:", dataForStorage.entryName);
+            }
+
+
+            console.log("Data untuk disimpan:", JSON.stringify(dataForStorage, null, 2));
+
+            const firestoreTimeout = 15000; let timeoutId;
+            const timeoutPromise = new Promise((_, reject) => { timeoutId = setTimeout(() => { reject(new Error(`Operasi penyimpanan ke Firestore melebihi ${firestoreTimeout / 1000} detik.`)); }, firestoreTimeout); });
+            try {
+                const docRef = await Promise.race([ db.collection("benchmarkData").add(dataForStorage), timeoutPromise ]); // Simpan data yg sudah disalin
+                clearTimeout(timeoutId);
+                if (docRef && docRef.id) {
+                    window.toast('Sukses!', { description: `Data berhasil disimpan ke Firebase! (ID: ${docRef.id})`, type: 'success', position: 'top-right' });
+                    // Reset form, grafik tetap
+                    clearFormInputs();
+                } else {
+                    throw new Error("Hasil operasi Firestore tidak valid.");
+                }
+            } catch (error) {
+                 clearTimeout(timeoutId); console.error("Error saat menyimpan data ke Firestore:", error); let errorMessageText = `Gagal menyimpan data ke Firebase: ${error.message}`;
+                 if (error.code === 'unavailable') { errorMessageText += " Layanan Firestore mungkin tidak tersedia."; }
+                 else if (error.code === 'permission-denied') { errorMessageText += " Izin ditolak. Periksa Security Rules."; }
+                 else if (error.message.includes('timeout') || error.message.includes('melebihi')) { errorMessageText = `Gagal menyimpan data: ${error.message} Periksa koneksi/status Firebase.`; }
+                 else if (error.code) { errorMessageText += ` (Kode: ${error.code})`; }
+                 window.toast('Gagal Menyimpan', { description: errorMessageText, type: 'danger', position: 'top-center' });
+            }
+        }
+
+        // Memperbarui data di Firestore (mode edit)
+         async function updateDataInFirestore(docId, dataToUpdate) { // dataToUpdate masih memiliki parameterIds
+             if (!db) { window.toast('Firestore Error', { description: 'Firestore tidak terinisialisasi. Tidak dapat update data.', type: 'danger', position: 'top-center' }); return; }
+             if (!docId) { window.toast('Update Error', { description: 'ID Dokumen untuk update tidak ditemukan.', type: 'danger', position: 'top-center' }); return; }
+             window.toast('Memperbarui...', { description: 'Memperbarui data di Firebase...', type: 'info', position: 'top-center' });
+
+             // Gunakan shallow copy untuk data storage
+             const dataForStorage = { ...dataToUpdate };
+             delete dataForStorage.parameterIds; // Hapus ID internal sebelum simpan
+             delete dataForStorage.timestamp; // Hapus timestamp agar tidak menimpa yang lama
+             // Pastikan nama histori ada (seharusnya sudah diambil dari cache di prepareChartData)
+             if (!dataForStorage.entryName) {
+                 console.warn("Nama histori tidak ada saat update, menggunakan nama model pertama.");
+                 const firstModelName = dataForStorage.models.length > 0 ? dataForStorage.models[0].name : 'Data Update';
+                 dataForStorage.entryName = firstModelName;
+             }
+             console.log("Data untuk diupdate:", JSON.stringify(dataForStorage, null, 2));
+
+             const firestoreTimeout = 15000; let timeoutId;
+             const timeoutPromise = new Promise((_, reject) => { timeoutId = setTimeout(() => { reject(new Error(`Operasi update Firestore melebihi ${firestoreTimeout / 1000} detik.`)); }, firestoreTimeout); });
+             try {
+                 await Promise.race([ db.collection("benchmarkData").doc(docId).set(dataForStorage, { merge: true }), timeoutPromise ]); // Update data yg sudah disalin
+                 clearTimeout(timeoutId);
+                 window.toast('Sukses!', { description: `Data berhasil diperbarui di Firebase!`, type: 'success', position: 'top-right' });
+
+                 // Reset state dan form, grafik tetap
+                 isEditMode = false;
+                 editingDocId = null;
+                 generateChartBtn.textContent = 'Buat Grafik'; // Kembalikan teks tombol utama
+                 cancelEditBtn.classList.add('hidden');
+                 editModeInfo.classList.add('hidden');
+                 resetChartBtn.classList.remove('hidden'); // Tampilkan tombol reset
+                 clearFormInputs();
+
+             } catch (error) {
+                 clearTimeout(timeoutId); console.error(`Error saat update dokumen ${docId}:`, error); let errorMessageText = `Gagal memperbarui data: ${error.message}`;
+                  if (error.code === 'permission-denied') { errorMessageText += " Izin ditolak. Periksa Security Rules."; }
+                  else if (error.message.includes('timeout') || error.message.includes('melebihi')) { errorMessageText = `Gagal memperbarui data: ${error.message} Periksa koneksi/status Firebase.`; }
+                  else if (error.code) { errorMessageText += ` (Kode: ${error.code})`; }
+                 window.toast('Gagal Update', { description: errorMessageText, type: 'danger', position: 'top-center' });
+             }
+         }
+
+        // Membuat/memperbarui grafik FusionCharts
+        function generateChartFromData(chartData, isHistory = false) {
+             // Cek parameterNames
+             if (!chartData || !chartData.models || !chartData.parameterNames) {
+                 window.toast('Data Error', { description: 'Data tidak valid untuk membuat grafik.', type: 'danger', position: 'top-right' });
+                 chartContainerDiv.innerHTML = '<p class="text-center text-red-600 p-4">Gagal memuat grafik: Data tidak valid.</p>';
+                 if (fusionChartInstance) { try { fusionChartInstance.dispose(); } catch(e){} fusionChartInstance = null; }
+                 return; // Hentikan jika data tidak valid
+             }
+
+             // Categories (Sumbu X): Nama Model
+             const categories = [{
+                 category: chartData.models.map(model => ({ label: model.name }))
+             }];
+             // Dataset (Seri): Setiap nama parameter menjadi satu seri
+             const dataset = chartData.parameterNames.map((paramName) => { // Iterasi berdasarkan nama parameter
+                 return {
+                     seriesname: paramName, // Nama seri = nama parameter
+                     data: chartData.models.map(model => ({
+                         // Ambil nilai dari model.scores menggunakan nama parameter
+                         value: model.scores[paramName] ?? 0 // Default 0 jika tidak ada
+                     }))
+                 };
+             });
+
+             // Tangani timestamp untuk subjudul
+             let subCaptionText = "Data Input Saat Ini"; // Default untuk data baru
+             if (isEditMode) {
+                 subCaptionText = `Mengedit Data (ID: ${editingDocId})`;
+             } else if (isHistory && chartData.timestamp) {
+                 // Hanya format jika timestamp valid
+                 const formattedTime = formatFirestoreTimestamp(chartData.timestamp);
+                 if (formattedTime !== 'Timestamp tidak valid' && formattedTime !== 'Error Format Timestamp') {
+                     subCaptionText = `Data dari ${formattedTime}`;
+                 } else {
+                     subCaptionText = 'Data Histori (Timestamp Error)';
+                 }
+             } else if (isHistory) {
+                  subCaptionText = 'Data Histori (Timestamp Tidak Ada)';
+             }
+             // Jika BUKAN histori dan BUKAN edit mode, coba format timestamp jika ada
+             else if (!isHistory && !isEditMode && chartData.timestamp) {
+                 const formattedTime = formatFirestoreTimestamp(chartData.timestamp);
+                 if (formattedTime !== 'Timestamp tidak valid' && formattedTime !== 'Error Format Timestamp') {
+                    // Opsi: Tampilkan waktu simpan jika berhasil diformat
+                    // subCaptionText = `Data Tersimpan ${formattedTime}`;
+                 }
+                 // Jika masih sentinel atau error, biarkan default "Data Input Saat Ini"
+             }
+
+
+             const dataSource = {
+                 chart: {
+                     caption: "Perbandingan Skor Benchmark Model",
+                     subCaption: subCaptionText, // Gunakan teks subjudul yang sudah diformat/ditangani
+                     xAxisName: "Model", yAxisName: "Skor (%)", numberSuffix: "%",
+                     theme: "fusion", yaxismaxvalue: "100", drawcrossline: "1",
+                     decimals: "2", forceDecimals: "0",
+                     plottooltext: "<b>$seriesName</b><br>$label: <b>$dataValue</b>"
+                 },
+                 categories: categories,
+                 dataset: dataset
+             };
+
+             // Render atau update grafik
+             if (fusionChartInstance) {
+                 try { fusionChartInstance.setJSONData(dataSource); }
+                 catch (error) { console.error("Gagal update data FusionCharts:", error); window.toast('Chart Error', { description: 'Terjadi kesalahan saat memperbarui grafik.', type: 'danger', position: 'top-right' }); renderNewFusionChart(dataSource); }
+             } else {
+                 renderNewFusionChart(dataSource);
+             }
+
+             // Panggil generateSummaryTable setelah grafik siap
+             generateSummaryTable(chartData);
+        }
+
+        // Fungsi untuk membuat tabel kesimpulan dengan gaya modern
+        function generateSummaryTable(chartData) {
+            const summaryTableDiv = document.getElementById('summaryTable');
+            if (!summaryTableDiv) {
+                console.error("Elemen #summaryTable tidak ditemukan.");
+                return;
+            }
+            summaryTableDiv.innerHTML = ''; // Kosongkan tabel sebelumnya
+
+            // Validasi data dasar
+            if (!chartData || !chartData.parameterNames || chartData.parameterNames.length === 0 || !chartData.models || chartData.models.length === 0) {
+                summaryTableDiv.innerHTML = '<p class="text-center text-gray-500 italic p-4">Data tidak cukup untuk membuat kesimpulan.</p>';
+                return;
+            }
+
+            // Kelas Tailwind untuk gaya modern
+            let tableHtml = `
+                <h3 class="text-base md:text-lg font-semibold mb-3 text-gray-700 text-center mt-4">Kesimpulan Model Unggulan per Kategori</h3>
+                <div class="overflow-x-auto bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">🌟 Kategori Terbaik</th>
+                                <th scope="col" class="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">🏆 Model Unggulan</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">`;
+
+            chartData.parameterNames.forEach((paramName) => {
+                let maxScore = -1;
+                let winners = [];
+
+                chartData.models.forEach(model => {
+                    // Pastikan skor adalah angka yang valid sebelum dibandingkan
+                    const score = parseFloat(model.scores[paramName]);
+                    if (!isNaN(score)) {
+                        if (score > maxScore) {
+                            maxScore = score;
+                            winners = [model.name]; // Reset pemenang
+                        } else if (score === maxScore) {
+                            winners.push(model.name); // Tambah jika skor sama
+                        }
+                    }
+                });
+
+                // Tambahkan baris ke tabel dengan gaya baru
+                tableHtml += `
+                    <tr class="hover:bg-gray-50 transition-colors duration-150">
+                         <td class="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm font-medium text-gray-900">${paramName}</td>
+                        <td class="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-700">
+                            ${maxScore === -1 ? '<span class="italic text-gray-400">N/A</span>' : winners.join(' / ')}
+                            ${maxScore !== -1 ? ` <span class="text-xs text-gray-400">(${maxScore.toFixed(2)}%)</span>` : ''}
+                        </td>
+                    </tr>`;
+            });
+
+            tableHtml += `
+                        </tbody>
+                    </table>
+                </div>`;
+
+            summaryTableDiv.innerHTML = tableHtml;
+        }
+
+
+        // Handler tombol utama (Buat Grafik & Simpan/Update)
+        function handleGenerateChartAndSave() {
+            const chartData = prepareChartData(); // Validasi & siapkan data (termasuk parameterIds)
+            if (chartData) {
+                generateChartFromData(chartData, false); // Tampilkan grafik & tabel kesimpulan (butuh parameterIds)
+
+                // Simpan atau update data
+                if (isEditMode && editingDocId) {
+                    updateDataInFirestore(editingDocId, chartData);
+                } else {
+                    saveDataToFirestore(chartData);
+                }
+            } else { // Jika data tidak valid
+                chartContainerDiv.innerHTML = '';
+                if (summaryTableContainer) summaryTableContainer.innerHTML = '<div id="summaryTable"></div>'; // Kosongkan tabel juga
+                if (fusionChartInstance) { try { fusionChartInstance.dispose(); } catch(e){} fusionChartInstance = null; }
+            }
+        }
+
+        // Handler tombol "Reset Grafik"
+        function handleResetChart() {
+            chartContainerDiv.innerHTML = ''; // Kosongkan grafik
+            if (summaryTableContainer) summaryTableContainer.innerHTML = '<div id="summaryTable"></div>'; // Kosongkan tabel
+            if (fusionChartInstance) {
+                try { fusionChartInstance.dispose(); } catch(e){}
+                fusionChartInstance = null;
+            }
+            window.toast('Grafik Direset', { type: 'info', position: 'top-right' });
+        }
+
+
+        // Render instance FusionCharts baru
+        function renderNewFusionChart(dataSource) {
+             try {
+                 chartContainerDiv.innerHTML = '';
+                 fusionChartInstance = new FusionCharts({ type: 'mscolumn2d', renderAt: 'chartContainer', width: '100%', height: '100%', dataFormat: 'json', dataSource: dataSource });
+                 fusionChartInstance.render();
+             } catch (error) {
+                 console.error("Gagal membuat FusionCharts:", error);
+                 window.toast('Chart Error', { description: 'Terjadi kesalahan saat membuat grafik.', type: 'danger', position: 'top-right' });
+                 chartContainerDiv.innerHTML = '<p class="text-center text-red-600 p-4">Gagal memuat grafik.</p>';
+                 fusionChartInstance = null;
+             }
+        }
+
+        // --- Fungsi untuk Histori ---
+
+        // Fungsi untuk mengupdate nama histori di Firestore
+        async function updateHistoryEntryName(docId, newName) {
+            if (!db || !docId) {
+                console.error("Firestore DB atau Doc ID tidak valid untuk update nama histori.");
+                window.toast('Error Internal', { description: 'Gagal menyimpan nama histori baru.', type: 'danger' });
+                return false; // Gagal
+            }
+            if (!newName || newName.trim() === '') {
+                 window.toast('Input Error', { description: 'Nama histori tidak boleh kosong.', type: 'warning' });
+                 return false; // Gagal
+            }
+
+            window.toast('Menyimpan...', { description: `Menyimpan nama histori "${newName}"...`, type: 'info' });
+            try {
+                await db.collection("benchmarkData").doc(docId).update({
+                    entryName: newName.trim()
+                });
+                window.toast('Sukses!', { description: 'Nama histori berhasil diperbarui.', type: 'success' });
+                // Update cache juga
+                if (historicalDataCache[docId]) {
+                    historicalDataCache[docId].entryName = newName.trim();
+                }
+                return true; // Sukses
+            } catch (error) {
+                console.error("Error updating history entry name:", error);
+                window.toast('Gagal Update Nama', { description: `Gagal menyimpan nama histori: ${error.message}`, type: 'danger' });
+                return false; // Gagal
+            }
+        }
+
+        // Fungsi untuk menangani edit inline nama histori
+        function enableHistoryNameEditing(spanElement, docId) {
+            const currentName = spanElement.textContent;
+            const parentDiv = spanElement.parentNode; // Div .history-item
+
+            // Buat input field
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentName;
+            input.className = 'history-name-input'; // Terapkan gaya CSS baru
+            input.dataset.docId = docId; // Simpan docId di input
+
+            // Ganti span dengan input
+            parentDiv.insertBefore(input, spanElement);
+            spanElement.style.display = 'none'; // Sembunyikan span
+            input.focus(); // Fokus ke input
+            input.select(); // Pilih semua teks
+
+            // Fungsi untuk menyimpan dan kembali ke span
+            const saveAndSwitchBack = async () => {
+                const newName = input.value.trim();
+                // Hanya update jika nama berubah
+                if (newName !== currentName && newName !== '') {
+                    const success = await updateHistoryEntryName(docId, newName);
+                    if (success) {
+                        spanElement.textContent = newName; // Update teks span jika berhasil
+                    } else {
+                         // Jika gagal, revert ke nama lama di span
+                         spanElement.textContent = currentName;
+                         window.toast('Update Gagal', { description: 'Nama histori tidak diperbarui.', type: 'warning'});
+                    }
+                } else {
+                     spanElement.textContent = currentName; // Kembalikan teks asli jika tidak ada perubahan atau kosong
+                }
+                // Hapus input dan tampilkan span lagi
+                if (parentDiv.contains(input)) {
+                    parentDiv.removeChild(input);
+                }
+                spanElement.style.display = 'block';
+            };
+
+            // Tambahkan event listener ke input
+            input.addEventListener('blur', saveAndSwitchBack);
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault(); // Cegah submit form jika ada
+                    saveAndSwitchBack();
+                } else if (event.key === 'Escape') {
+                    // Batal edit, kembalikan span dengan nama asli
+                    if (parentDiv.contains(input)) {
+                        parentDiv.removeChild(input);
+                    }
+                    spanElement.textContent = currentName;
+                    spanElement.style.display = 'block';
+                }
+            });
+        }
+
+
+        async function openHistoryModal() {
+            if (!db) { window.toast('Firestore Error', { description: 'Tidak dapat memuat histori: Firestore tidak terinisialisasi.', type: 'danger', position: 'top-center' }); return; }
+            historyModal.classList.remove('hidden');
+            // Tampilkan spinner dan teks shimmer
+            historyListDiv.innerHTML = `
+                <div class="flex flex-col justify-center items-center h-32">
+                    <div class="loader mb-4"></div>
+                    <p class="shimmer-text text-gray-500 text-sm">Memuat data histori...</p>
+                </div>
+            `;
+            historicalDataCache = {}; // Kosongkan cache
+            try {
+                const querySnapshot = await db.collection("benchmarkData").orderBy("timestamp", "desc").limit(20).get();
+                if (querySnapshot.empty) { historyListDiv.innerHTML = '<p class="text-center text-gray-500 p-4">Belum ada data histori.</p>'; return; }
+                historyListDiv.innerHTML = ''; // Kosongkan spinner/pesan sebelumnya
+                querySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const docId = doc.id;
+                    historicalDataCache[docId] = data; // Simpan ke cache
+
+                    const historyItemWrapper = document.createElement('div');
+                    historyItemWrapper.className = 'history-item-wrapper';
+                    historyItemWrapper.dataset.id = docId;
+
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'history-item';
+
+                    // Tampilkan nama histori (jika ada) atau default
+                    const entryName = data.entryName || `Benchmark (${formatFirestoreTimestamp(data.timestamp)})`; // Nama default jika tidak ada
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'history-entry-name'; // Terapkan gaya CSS
+                    nameSpan.textContent = entryName;
+                    nameSpan.title = "Klik untuk edit nama histori"; // Tooltip
+                    // *** PERBAIKAN: Tambahkan event.stopPropagation() ***
+                    nameSpan.addEventListener('click', (event) => {
+                        event.stopPropagation(); // Hentikan event agar tidak trigger loadHistoryEntry
+                        enableHistoryNameEditing(nameSpan, docId);
+                    });
+
+                    const timeString = formatFirestoreTimestamp(data.timestamp);
+                    const modelNames = (data.models || []).map(m => m.name).slice(0, 3).join(', ') + ((data.models || []).length > 3 ? '...' : '');
+
+                    // Susun elemen di dalam historyItem
+                    historyItem.appendChild(nameSpan); // Tambahkan span nama
+                    const timeDiv = document.createElement('div');
+                    timeDiv.className = 'history-item-time';
+                    timeDiv.textContent = timeString;
+                    historyItem.appendChild(timeDiv);
+
+                    const modelsDiv = document.createElement('div');
+                    modelsDiv.className = 'history-item-models';
+                    modelsDiv.textContent = `Model: ${modelNames || 'Tidak ada'}`;
+                    historyItem.appendChild(modelsDiv);
+
+                    // Listener untuk load grafik tetap di div utama
+                    historyItem.addEventListener('click', () => loadHistoryEntry(docId));
+
+                    const editButton = document.createElement('button');
+                    editButton.className = 'history-action-btn history-edit-btn'; editButton.innerHTML = '✎'; editButton.title = 'Edit data benchmark ini';
+                    editButton.addEventListener('click', (event) => { event.stopPropagation(); loadDataForEdit(docId); });
+
+                    const deleteButton = document.createElement('button');
+                    deleteButton.className = 'history-action-btn history-delete-btn'; deleteButton.innerHTML = '&times;'; deleteButton.title = 'Hapus data histori ini';
+                    deleteButton.addEventListener('click', (event) => { event.stopPropagation(); openDeleteConfirmModal(docId); });
+
+                    historyItemWrapper.appendChild(historyItem);
+                    historyItemWrapper.appendChild(editButton);
+                    historyItemWrapper.appendChild(deleteButton);
+                    historyListDiv.appendChild(historyItemWrapper);
+                });
+            } catch (error) { console.error("Error mengambil histori:", error); historyListDiv.innerHTML = `<p class="text-red-600 text-center p-4">Gagal memuat histori: ${error.message}</p>`; }
+        }
+        function closeHistoryModal() { historyModal.classList.add('hidden'); }
+        // Memuat entri histori ke grafik
+        function loadHistoryEntry(docId) {
+            const data = historicalDataCache[docId];
+            if (data) {
+                console.log("Memuat data histori:", docId);
+                // Data sudah dalam format { scores: { paramName: value } }
+                generateChartFromData(data, true); // Tampilkan grafik & tabel kesimpulan
+                closeHistoryModal();
+                window.toast('Histori Dimuat', { description: `Menampilkan grafik dari histori (${formatFirestoreTimestamp(data.timestamp)})`, type: 'info', position: 'top-right' });
+                if (isEditMode) { cancelEdit(); } // Keluar mode edit jika sedang aktif
+            } else { console.error("Data histori tidak ditemukan di cache untuk ID:", docId); window.toast('Error', { description: 'Gagal memuat data histori yang dipilih.', type: 'danger', position: 'top-right' }); }
+        }
+        // Buka modal konfirmasi hapus
+        function openDeleteConfirmModal(docId) {
+            if (!docId) return; docIdToDelete = docId; const data = historicalDataCache[docId];
+            const timeString = data ? formatFirestoreTimestamp(data.timestamp) : `ID: ${docId}`;
+            deleteConfirmMessage.textContent = `Apakah Anda yakin ingin menghapus data histori dari ${timeString}? Tindakan ini tidak dapat diurungkan.`;
+            deleteConfirmModal.classList.remove('hidden');
+        }
+        function closeDeleteConfirmModal() { deleteConfirmModal.classList.add('hidden'); docIdToDelete = null; }
+        // Eksekusi hapus histori
+        async function executeDeleteHistoryEntry() {
+            if (!docIdToDelete) return; const docId = docIdToDelete;
+            const itemWrapperToRemove = historyListDiv.querySelector(`.history-item-wrapper[data-id="${docId}"]`);
+            confirmDeleteBtn.disabled = true; cancelDeleteBtnModal.disabled = true; confirmDeleteBtn.textContent = 'Menghapus...';
+            if (!db) { window.toast('Firestore Error', { description: 'Firestore tidak terinisialisasi. Tidak dapat menghapus data.', type: 'danger', position: 'top-center' }); closeDeleteConfirmModal(); confirmDeleteBtn.disabled = false; cancelDeleteBtnModal.disabled = false; confirmDeleteBtn.textContent = 'Ya, Hapus'; return; }
+            try {
+                await db.collection("benchmarkData").doc(docId).delete();
+                if (itemWrapperToRemove) { itemWrapperToRemove.remove(); } // Hapus dari tampilan
+                delete historicalDataCache[docId]; // Hapus dari cache
+                window.toast('Sukses', { description: 'Data histori berhasil dihapus.', type: 'success', position: 'top-right' });
+                if (historyListDiv.children.length === 0) { historyListDiv.innerHTML = '<p class="text-gray-500">Belum ada data histori.</p>'; }
+            } catch (error) { console.error("Error menghapus data histori:", error); window.toast('Gagal Menghapus', { description: `Gagal menghapus data histori: ${error.message}`, type: 'danger', position: 'top-center' }); }
+            finally { closeDeleteConfirmModal(); confirmDeleteBtn.disabled = false; cancelDeleteBtnModal.disabled = false; confirmDeleteBtn.textContent = 'Ya, Hapus'; }
+        }
+        // Memuat data histori ke form untuk diedit
+        function loadDataForEdit(docId) {
+            const data = historicalDataCache[docId];
+            // Validasi data histori (harus punya parameterNames dan models)
+            if (!data || !data.parameterNames || !data.models) {
+                window.toast('Error', { description: 'Data histori tidak ditemukan atau formatnya tidak sesuai untuk diedit.', type: 'danger', position: 'top-right' });
+                if(data) console.error("Data histori tidak valid:", data);
+                return;
+            }
+            console.log("Memuat data untuk diedit:", docId);
+            isEditMode = true; editingDocId = docId;
+
+            parameterContainer.innerHTML = ''; modelContainer.innerHTML = ''; // Kosongkan form
+
+            // Buat map paramName ke paramId (ID dibuat baru saat load edit)
+            const paramNameToIdMap = {};
+            data.parameterNames.forEach((name) => {
+                const newId = generateUniqueId('param'); // Selalu buat ID baru saat load edit
+                paramNameToIdMap[name] = newId;
+                addParameterInput(name, newId); // Tambahkan input parameter dgn ID baru
+            });
+
+            // Buat map paramId ke paramName untuk updateModelInputsForGroup
+            const paramIdToNameMap = {};
+            Object.entries(paramNameToIdMap).forEach(([name, id]) => {
+                paramIdToNameMap[id] = name;
+            });
+
+            // Isi model dan skor
+            data.models.forEach(modelData => {
+                const modelGroup = addModelInput(modelData.name, null); // Tambah model input
+                // Isi skor berdasarkan NAMA
+                updateModelInputsForGroup(modelGroup, modelData.scores, paramIdToNameMap); // scoresData sudah dalam format { namaParam: skor }
+            });
+
+            updateRemoveButtons('#parameterContainer', '.parameter-input-group');
+            updateRemoveButtons('#modelContainer', '.model-input-group');
+            generateChartBtn.textContent = 'Update Grafik'; // Ubah teks tombol utama
+            cancelEditBtn.classList.remove('hidden');
+            resetChartBtn.classList.add('hidden'); // Sembunyikan tombol reset saat edit
+            editModeInfo.classList.remove('hidden');
+            generateChartFromData(data, true); // Tampilkan grafik & tabel kesimpulan
+            closeHistoryModal();
+            window.toast('Mode Edit Aktif', { description: `Memuat data dari ${formatFirestoreTimestamp(data.timestamp)} untuk diedit.`, type: 'info', position: 'top-right' });
+        }
+         // Batal mode edit
+         function cancelEdit() {
+             isEditMode = false; editingDocId = null;
+             clearFormInputs(); // Reset form (termasuk tabel kesimpulan)
+             generateChartBtn.textContent = 'Buat Grafik'; // Kembalikan teks tombol utama
+             cancelEditBtn.classList.add('hidden');
+             resetChartBtn.classList.remove('hidden'); // Tampilkan kembali tombol reset
+             editModeInfo.classList.add('hidden');
+             chartContainerDiv.innerHTML = ''; // Kosongkan grafik
+             if (fusionChartInstance) { try { fusionChartInstance.dispose(); } catch(e){} fusionChartInstance = null; }
+             // Tampilkan toast batal HANYA di sini
+             window.toast('Mode Edit Dibatalkan', { type: 'info', position: 'top-right' });
+         }
+
+        // --- Event Listeners ---
+        addParameterBtn.addEventListener('click', () => addParameterInput());
+        addModelBtn.addEventListener('click', () => addModelInput());
+        generateChartBtn.addEventListener('click', handleGenerateChartAndSave); // Tombol utama
+        resetChartBtn.addEventListener('click', handleResetChart); // Tombol reset
+        viewHistoryBtn.addEventListener('click', openHistoryModal);
+        cancelEditBtn.addEventListener('click', cancelEdit); // Tombol Batal Edit memanggil fungsi ini
+        closeHistoryModalBtn.addEventListener('click', closeHistoryModal);
+        historyModal.addEventListener('click', (event) => { if (event.target === historyModal) { closeHistoryModal(); } }); // Klik luar modal histori
+        cancelDeleteBtnModal.addEventListener('click', closeDeleteConfirmModal);
+        confirmDeleteBtn.addEventListener('click', executeDeleteHistoryEntry);
+        // *** PERUBAHAN: Tambahkan listener untuk tombol tutup modal delete ***
+        if (closeDeleteConfirmModalBtn) {
+            closeDeleteConfirmModalBtn.addEventListener('click', closeDeleteConfirmModal);
+        }
+        deleteConfirmModal.addEventListener('click', (event) => { if (event.target === deleteConfirmModal) { closeDeleteConfirmModal(); } }); // Klik luar modal hapus
+
+        // --- Inisialisasi Awal ---
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM fully loaded and parsed");
+            // Beri ID unik ke elemen awal jika belum ada
+            parameterContainer.querySelectorAll('.parameter-input-group:not([data-param-id])').forEach((el, i) => el.dataset.paramId = `param_initial_${i}`);
+            modelContainer.querySelectorAll('.model-input-group:not([data-model-id])').forEach((el, i) => el.dataset.modelId = `model_initial_${i}`);
+
+            updateModelInputs(); // Update skor awal
+            parameterContainer.querySelectorAll('.parameter-input-group').forEach(addDragDropListeners); // Tambah D&D
+            parameterContainer.querySelectorAll('.parameter-name').forEach(input => { input.addEventListener('input', () => handleParameterNameInput(input)); }); // Listener nama param
+            updateRemoveButtons('#parameterContainer', '.parameter-input-group'); // Status tombol hapus awal
+            updateRemoveButtons('#modelContainer', '.model-input-group');
+
+            // Panggil inisialisasi Firebase setelah DOM siap,
+            // Alpine akan menginisialisasi komponennya sendiri setelahnya
+            initializeFirebase();
+        });
+
+    </script>
+
+</body>
+
+</html>
