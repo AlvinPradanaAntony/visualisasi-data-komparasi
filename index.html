@@ -318,28 +318,18 @@
                             else { this.alignBottom(topToast, bottomToast); bottomToast.style.transform = 'translateY(32px)'; }
                         }
 
-                        if(this.toasts.length == 3) return;
-                        let burnToast = document.getElementById( this.toasts[3].id );
-                         if (!burnToast) return;
-                        burnToast.style.zIndex = 70;
-                        let burnToastPosition;
-                        if(this.expanded){
-                            burnToastPosition = topToast.getBoundingClientRect().height + this.paddingBetweenToasts + middleToast.getBoundingClientRect().height + this.paddingBetweenToasts + bottomToast.getBoundingClientRect().height + this.paddingBetweenToasts + 'px';
-                            if(this.position.includes('bottom')){ burnToast.style.top = 'auto'; burnToast.style.bottom = burnToastPosition; }
-                            else { burnToast.style.top = burnToastPosition; }
-                            burnToast.style.scale = '100%'; burnToast.style.transform = 'translateY(0px)';
-                        } else {
-                            burnToast.style.scale = '82%';
-                            if (topToast && burnToast) this.alignBottom(topToast, burnToast);
-                            burnToast.style.transform = 'translateY(48px)';
+                        // *** PERUBAHAN: Penanganan toast ke-4 dan seterusnya ***
+                        if(this.toasts.length > 3) {
+                            for(let i = 3; i < this.toasts.length; i++) {
+                                let excessToast = this.getToastWithId(this.toasts[i].id);
+                                if (excessToast) {
+                                    // Panggil burnToast untuk menghapus toast secara bertahap
+                                    // Tambahkan sedikit delay agar tidak semua hilang bersamaan jika ada banyak
+                                    setTimeout(() => this.burnToast(excessToast.id), (i - 3) * 100);
+                                }
+                            }
                         }
-                        if (burnToast.firstElementChild) {
-                            burnToast.firstElementChild.classList.remove('opacity-100');
-                            burnToast.firstElementChild.classList.add('opacity-0');
-                        }
-                        let that = this;
-                        setTimeout(function(){ that.toasts.pop(); }, 300);
-                        return;
+                        return; // Hentikan di sini agar tidak ada styling aneh untuk toast ke-4
                     },
                     alignBottom(element1, element2) { if (!element1 || !element2) return; let top1 = element1.offsetTop; let height1 = element1.offsetHeight; let height2 = element2.offsetHeight; let top2 = top1 + (height1 - height2); element2.style.top = top2 + 'px'; },
                     alignTop(element1, element2) { if (!element1 || !element2) return; let top1 = element1.offsetTop; element2.style.top = top1 + 'px'; },
@@ -378,9 +368,9 @@
                         :id="toast.id"
                         x-data="{
                             toastHovered: false,
-                            isPaused: false, // *** BARU: Flag untuk status jeda ***
+                            isPaused: false,
                             startTime: 0,
-                            initialDuration: 4000, // Durasi awal dalam ms
+                            initialDuration: 4000,
                             remainingTime: 4000,
                             autoHideTimeout: null,
                             progressBar: null,
@@ -388,29 +378,26 @@
                             startHideTimer(duration) {
                                 clearTimeout(this.autoHideTimeout);
                                 this.autoHideTimeout = setTimeout(() => {
-                                    // Hanya burn jika tidak dijeda (tidak dihover)
-                                    if (!this.isPaused) {
+                                    if (!this.isPaused) { // Hanya burn jika tidak dijeda
                                         burnToast(toast.id);
                                     }
                                 }, duration);
                             },
                             pause() {
-                                if (this.isPaused) return; // Jangan lakukan apa-apa jika sudah dijeda
+                                if (this.isPaused) return;
                                 this.isPaused = true;
-                                clearTimeout(this.autoHideTimeout); // Hapus timer
+                                clearTimeout(this.autoHideTimeout);
                                 const elapsed = Date.now() - this.startTime;
                                 this.remainingTime -= elapsed;
-                                if (this.remainingTime < 0) this.remainingTime = 0; // Pastikan tidak negatif
-                                if (this.progressBar) this.progressBar.classList.add('paused'); // Jeda animasi CSS
-                                console.log(`Toast [${toast.id}]: Paused. Remaining: ${this.remainingTime}ms`);
+                                if (this.remainingTime < 0) this.remainingTime = 0;
+                                if (this.progressBar) this.progressBar.classList.add('paused');
                             },
                             resume() {
-                                if (!this.isPaused) return; // Jangan lakukan apa-apa jika tidak dijeda
+                                if (!this.isPaused) return;
                                 this.isPaused = false;
-                                this.startTime = Date.now(); // Reset waktu mulai untuk jeda berikutnya
-                                if (this.progressBar) this.progressBar.classList.remove('paused'); // Lanjutkan animasi CSS
-                                this.startHideTimer(this.remainingTime); // Mulai timer baru dengan sisa waktu
-                                console.log(`Toast [${toast.id}]: Resumed. Starting timer for ${this.remainingTime}ms`);
+                                this.startTime = Date.now();
+                                if (this.progressBar) this.progressBar.classList.remove('paused');
+                                this.startHideTimer(this.remainingTime);
                             }
                         }"
                         x-init="
@@ -427,22 +414,20 @@
                                         else { el.firstElementChild.classList.remove('opacity-0', '-translate-y-full'); }
                                         el.firstElementChild.classList.add('opacity-100', 'translate-y-0');
                                         if (progressBar) {
-                                            progressBar.classList.add('animate'); // Mulai animasi CSS
-                                            startTime = Date.now(); // Set waktu mulai
-                                            startHideTimer(initialDuration); // Mulai timer JS awal
+                                            progressBar.classList.add('animate');
+                                            startTime = Date.now();
+                                            startHideTimer(initialDuration);
                                         } else {
-                                            startHideTimer(initialDuration); // Fallback jika progress bar tidak ada
+                                            startHideTimer(initialDuration);
                                         }
                                     }
                                     setTimeout(() => stackToasts(), 10);
                                 }, 5);
                             }, 50);
 
-                             // Watcher untuk hover pada item toast
                              $watch('toastHovered', (value) => {
                                 if (value || toastsHovered) { pause(); } else { resume(); }
                              });
-                             // Watcher untuk hover pada container toast
                              $watch('toastsHovered', (value) => {
                                 if (value || toastHovered) { pause(); } else { resume(); }
                              });
