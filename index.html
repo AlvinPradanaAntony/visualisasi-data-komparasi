@@ -214,6 +214,92 @@
             to { width: 0%; }
         }
 
+        /* Gaya untuk Kartu Notifikasi */
+        .notification-card {
+            border-radius: 0.375rem; /* rounded-md */
+            padding: 0.75rem; /* p-3 */
+            margin-bottom: 0.5rem; /* mb-2 */
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            position: relative;
+        }
+        .notification-card-content {
+            flex-grow: 1;
+            margin-right: 1rem; /* Jarak dari tombol hapus */
+        }
+        .notification-card-message {
+            font-weight: 500; /* medium */
+            margin-bottom: 0.25rem; /* mb-1 */
+        }
+        .notification-card-description {
+            font-size: 0.875rem; /* text-sm */
+            color: #6b7280; /* text-gray-500 */
+            margin-bottom: 0.25rem; /* mb-1 */
+        }
+        .notification-card-time {
+            font-size: 0.75rem; /* text-xs */
+            color: #9ca3af; /* text-gray-400 */
+        }
+        .notification-delete-btn {
+            background: none;
+            border: none;
+            color: #9ca3af; /* text-gray-400 */
+            cursor: pointer;
+            padding: 0.25rem; /* p-1 */
+            line-height: 1;
+            transition: color 0.2s;
+            flex-shrink: 0; /* Agar tombol tidak mengecil */
+        }
+        .notification-delete-btn:hover {
+            color: #ef4444; /* text-red-500 */
+        }
+        /* Warna border kiri berdasarkan tipe */
+        .notification-card-success { border-left: 4px solid #10b981; /* green-500 */ background-color: #f0fdf4; /* green-50 */}
+        .notification-card-info { border-left: 4px solid #3b82f6; /* blue-500 */ background-color: #eff6ff; /* blue-50 */ }
+        .notification-card-warning { border-left: 4px solid #f59e0b; /* amber-500 */ background-color: #fffbeb; /* amber-50 */ }
+        .notification-card-danger { border-left: 4px solid #ef4444; /* red-500 */ background-color: #fef2f2; /* red-50 */ }
+        .notification-card-default { border-left: 4px solid #6b7280; /* gray-500 */ background-color: #f9fafb; /* gray-50 */ }
+
+        /* Gaya untuk FAB Notifikasi */
+        #notificationFabContainer {
+            position: fixed;
+            bottom: 2rem; /* 8 (Tailwind) */
+            right: 2rem; /* 8 (Tailwind) */
+            z-index: 40; /* Di bawah modal tapi di atas konten lain */
+        }
+        #viewNotificationBtn {
+            background-color: #8b5cf6; /* purple-500 */
+            color: white;
+            width: 3.5rem; /* w-14 */
+            height: 3.5rem; /* h-14 */
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.2s;
+        }
+        #viewNotificationBtn:hover {
+            background-color: #7c3aed; /* purple-600 */
+        }
+        #notificationBadge {
+            position: absolute;
+            top: -0.25rem; /* -top-1 */
+            right: -0.25rem; /* -right-1 */
+            background-color: #ef4444; /* red-500 */
+            color: white;
+            font-size: 0.75rem; /* text-xs */
+            font-weight: bold;
+            width: 1.25rem; /* w-5 */
+            height: 1.25rem; /* h-5 */
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white; /* Border putih agar lebih menonjol */
+        }
+
 
         [x-cloak] { display: none !important; }
     </style>
@@ -227,20 +313,19 @@
 
     <div x-data x-init="
             window.toast = function(message, options = {}){
-                let description = '';
-                let type = 'default';
-                let position = 'top-center'; // Default position
-                let html = '';
-                if(typeof options.description != 'undefined') description = options.description;
-                if(typeof options.type != 'undefined') type = options.type;
-                if(typeof options.position != 'undefined') position = options.position;
-                if(typeof options.html != 'undefined') html = options.html;
+                let description = options.description || '';
+                let type = options.type || 'default';
+                let position = options.position || 'top-center';
+                let html = options.html || '';
+                let saveToDb = options.saveToDb !== undefined ? options.saveToDb : true; // Default true
 
-                // Pastikan Alpine sudah siap sebelum dispatch event
+                if (saveToDb) {
+                    saveNotificationToFirestore(message, { description, type });
+                }
+
                 if (window.Alpine) {
                      window.dispatchEvent(new CustomEvent('toast-show', { detail : { type: type, message: message, description: description, position : position, html: html }}));
                 } else {
-                    // Fallback atau tunda jika Alpine belum siap
                     document.addEventListener('alpine:initialized', () => {
                          window.dispatchEvent(new CustomEvent('toast-show', { detail : { type: type, message: message, description: description, position : position, html: html }}));
                     });
@@ -256,7 +341,6 @@
                     layout: 'default',
                     position: 'top-center',
                     paddingBetweenToasts: 15,
-                    // Fungsi-fungsi toast (burnToast, getToastWithId, stackToasts, dll.) - Versi Original
                     deleteToastWithId (id){ for(let i = 0; i < this.toasts.length; i++){ if(this.toasts[i].id === id){ this.toasts.splice(i, 1); break; } } },
                     burnToast(id){
                         let burnToast = this.getToastWithId(id);
@@ -318,18 +402,15 @@
                             else { this.alignBottom(topToast, bottomToast); bottomToast.style.transform = 'translateY(32px)'; }
                         }
 
-                        // *** PERUBAHAN: Penanganan toast ke-4 dan seterusnya ***
                         if(this.toasts.length > 3) {
                             for(let i = 3; i < this.toasts.length; i++) {
                                 let excessToast = this.getToastWithId(this.toasts[i].id);
                                 if (excessToast) {
-                                    // Panggil burnToast untuk menghapus toast secara bertahap
-                                    // Tambahkan sedikit delay agar tidak semua hilang bersamaan jika ada banyak
                                     setTimeout(() => this.burnToast(excessToast.id), (i - 3) * 100);
                                 }
                             }
                         }
-                        return; // Hentikan di sini agar tidak ada styling aneh untuk toast ke-4
+                        return;
                     },
                     alignBottom(element1, element2) { if (!element1 || !element2) return; let top1 = element1.offsetTop; let height1 = element1.offsetHeight; let height2 = element2.offsetHeight; let top2 = top1 + (height1 - height2); element2.style.top = top2 + 'px'; },
                     alignTop(element1, element2) { if (!element1 || !element2) return; let top1 = element1.offsetTop; element2.style.top = top1 + 'px'; },
@@ -378,7 +459,7 @@
                             startHideTimer(duration) {
                                 clearTimeout(this.autoHideTimeout);
                                 this.autoHideTimeout = setTimeout(() => {
-                                    if (!this.isPaused) { // Hanya burn jika tidak dijeda
+                                    if (!this.isPaused) {
                                         burnToast(toast.id);
                                     }
                                 }, duration);
@@ -532,7 +613,18 @@
                 </div>
             </div>
 
-        </div> </div>
+        </div>
+    </div>
+
+     <div id="notificationFabContainer">
+        <button type="button" id="viewNotificationBtn" title="Lihat Notifikasi">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341A6.002 6.002 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span id="notificationBadge" class="hidden">0</span>
+        </button>
+    </div>
+
 
     <div id="historyModal" class="modal-overlay hidden">
         <div class="modal-content relative">
@@ -547,6 +639,25 @@
         </div>
     </div>
 
+    <div id="notificationModal" class="modal-overlay hidden">
+        <div class="modal-content relative">
+            <button id="closeNotificationModalBtn" class="modal-close-btn" title="Tutup">&times;</button>
+            <div class="flex justify-between items-center mb-4">
+                 <h2 class="text-xl font-semibold text-gray-700">Pusat Notifikasi</h2>
+                 <button id="clearAllNotificationsBtn" class="text-xs bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded-md transition duration-200">
+                     Hapus Semua
+                 </button>
+            </div>
+            <div id="notificationList" class="space-y-2 max-h-96 overflow-y-auto">
+                 <div class="flex flex-col justify-center items-center h-32">
+                    <div class="loader mb-4"></div>
+                    <p class="shimmer-text text-gray-500 text-sm">Memuat notifikasi...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <div id="deleteConfirmModal" class="modal-overlay hidden">
         <div class="modal-content relative">
              <button id="closeDeleteConfirmModalBtn" class="modal-close-btn" title="Tutup">&times;</button>
@@ -558,6 +669,35 @@
                  </button>
                  <button id="confirmDeleteBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200">
                      Ya, Hapus
+                 </button>
+             </div>
+        </div>
+    </div>
+
+     <div id="deleteNotificationConfirmModal" class="modal-overlay hidden">
+        <div class="modal-content relative">
+             <h3 class="text-lg font-semibold mb-3 text-gray-700">Konfirmasi Hapus Notifikasi</h3>
+             <p id="deleteNotificationConfirmMessage" class="text-gray-600 mb-4">Apakah Anda yakin ingin menghapus notifikasi ini?</p>
+             <div class="confirm-buttons">
+                 <button id="cancelDeleteNotificationBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-md transition duration-200">
+                     Batal
+                 </button>
+                 <button id="confirmDeleteNotificationBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200">
+                     Ya, Hapus
+                 </button>
+             </div>
+        </div>
+    </div>
+    <div id="clearAllNotificationsConfirmModal" class="modal-overlay hidden">
+        <div class="modal-content relative">
+             <h3 class="text-lg font-semibold mb-3 text-gray-700">Konfirmasi Hapus Semua Notifikasi</h3>
+             <p class="text-gray-600 mb-4">Apakah Anda yakin ingin menghapus SEMUA notifikasi? Tindakan ini tidak dapat diurungkan.</p>
+             <div class="confirm-buttons">
+                 <button id="cancelClearAllNotificationsBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-md transition duration-200">
+                     Batal
+                 </button>
+                 <button id="confirmClearAllNotificationsBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200">
+                     Ya, Hapus Semua
                  </button>
              </div>
         </div>
@@ -587,6 +727,26 @@
         const cancelDeleteBtnModal = document.getElementById('cancelDeleteBtn');
         const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
         const closeDeleteConfirmModalBtn = document.getElementById('closeDeleteConfirmModalBtn');
+
+        // Variabel untuk Notifikasi
+        const viewNotificationBtn = document.getElementById('viewNotificationBtn');
+        const notificationModal = document.getElementById('notificationModal');
+        const closeNotificationModalBtn = document.getElementById('closeNotificationModalBtn');
+        const notificationListDiv = document.getElementById('notificationList');
+        const clearAllNotificationsBtn = document.getElementById('clearAllNotificationsBtn');
+        const deleteNotificationConfirmModal = document.getElementById('deleteNotificationConfirmModal');
+        const deleteNotificationConfirmMessage = document.getElementById('deleteNotificationConfirmMessage');
+        const cancelDeleteNotificationBtn = document.getElementById('cancelDeleteNotificationBtn');
+        const confirmDeleteNotificationBtn = document.getElementById('confirmDeleteNotificationBtn');
+        const clearAllNotificationsConfirmModal = document.getElementById('clearAllNotificationsConfirmModal');
+        const cancelClearAllNotificationsBtn = document.getElementById('cancelClearAllNotificationsBtn');
+        const confirmClearAllNotificationsBtn = document.getElementById('confirmClearAllNotificationsBtn');
+        const notificationsCollection = "notifications"; // Nama koleksi Firestore
+        let notificationDocIdToDelete = null;
+        let notificationElementToDelete = null;
+        const notificationBadge = document.getElementById('notificationBadge');
+
+
         let fusionChartInstance = null;
         let draggedItem = null;
         let dropTargetIndicator = null;
@@ -619,20 +779,26 @@
                     firebase.initializeApp(firebaseConfig);
                     db = firebase.firestore();
                     console.log("Firebase berhasil diinisialisasi.");
-                    // Aktifkan tombol utama & histori
+                    // Aktifkan tombol utama & histori & notifikasi
                     generateChartBtn.disabled = false; generateChartBtn.title = ""; generateChartBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                     viewHistoryBtn.disabled = false; viewHistoryBtn.title = ""; viewHistoryBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                     // Aktifkan tombol reset grafik (default state)
                     resetChartBtn.disabled = false; resetChartBtn.classList.remove('hidden');
+                    if(viewNotificationBtn) { // Cek jika tombol notifikasi ada
+                        viewNotificationBtn.disabled = false; viewNotificationBtn.title = "Lihat Notifikasi"; viewNotificationBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        fetchAndUpdateNotificationBadge(); // Muat badge awal
+                    }
                 }
             } catch (error) {
                 console.error("Gagal menginisialisasi Firebase:", error);
                 window.toast('Error Inisialisasi Firebase!', { description: `Gagal menginisialisasi Firebase: ${error.message}. Penyimpanan & Histori tidak akan berfungsi.`, type: 'danger', position: 'top-center' });
-                // Nonaktifkan tombol utama & histori
+                // Nonaktifkan tombol utama & histori & notifikasi
                 generateChartBtn.disabled = true; generateChartBtn.title = "Inisialisasi Firebase gagal."; generateChartBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 viewHistoryBtn.disabled = true; viewHistoryBtn.title = "Inisialisasi Firebase gagal."; viewHistoryBtn.classList.add('opacity-50', 'cursor-not-allowed');
                  // Sembunyikan tombol reset jika init gagal
                 resetChartBtn.classList.add('hidden');
+                 if(viewNotificationBtn) {
+                    viewNotificationBtn.disabled = true; viewNotificationBtn.title = "Inisialisasi Firebase gagal."; viewNotificationBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                 }
             }
         }
         // Panggil init setelah Alpine siap (event listener di bawah)
@@ -642,17 +808,28 @@
              return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         }
         function formatFirestoreTimestamp(timestamp) {
+            if (!timestamp) return 'Timestamp tidak ada'; // Handle null/undefined timestamp
             if (timestamp && typeof timestamp.toDate === 'function') {
                 try {
                     const date = timestamp.toDate();
-                    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+                    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }; // Tambah detik
                     return date.toLocaleDateString('id-ID', options);
                 } catch (error) {
                     console.error("Error formatting timestamp:", error, "Input:", timestamp);
                     return 'Error Format Timestamp';
                 }
             }
-            console.warn("formatFirestoreTimestamp received invalid or non-Timestamp input:", timestamp);
+             // Jika bukan objek Timestamp Firestore, coba format sebagai Date biasa
+             if (timestamp instanceof Date) {
+                 try {
+                    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+                    return timestamp.toLocaleDateString('id-ID', options);
+                 } catch(e) {
+                     console.error("Error formatting Date object:", e, "Input:", timestamp);
+                     return 'Error Format Tanggal';
+                 }
+             }
+            console.warn("formatFirestoreTimestamp received invalid input type:", timestamp);
             return 'Timestamp tidak valid';
         }
 
@@ -673,8 +850,7 @@
                      const scoresContainer = group.querySelector('.scores-container');
                      if (scoresContainer) {
                          scoresContainer.innerHTML = '';
-                         // *** PERBAIKAN: Pastikan hidden saat reset ***
-                         scoresContainer.classList.add('hidden');
+                         scoresContainer.classList.add('hidden'); // Pastikan tersembunyi saat reset
                          const toggleBtn = group.querySelector('.toggle-scores-btn');
                          if (toggleBtn) toggleBtn.innerHTML = 'Input Skor Parameter &#9662;'; // Reset teks tombol
                      }
@@ -795,7 +971,7 @@
             const parameterCount = parameterContainer.querySelectorAll('.parameter-input-group').length;
             let gridClasses = 'grid gap-3 '; // Base grid classes
             if (parameterCount > 1) {
-                gridClasses += 'grid-cols-1 md:grid-cols-2 md:gap-4'; // 2 kolom di md+ jika > 1 param
+                gridClasses += 'grid-cols-2 md:gap-4'; // 2 kolom di md+ jika > 1 param
             } else {
                 gridClasses += 'grid-cols-1'; // 1 kolom jika 1 param
             }
@@ -1261,7 +1437,7 @@
                 try { fusionChartInstance.dispose(); } catch(e){}
                 fusionChartInstance = null;
             }
-            window.toast('Grafik Direset', { type: 'info', position: 'top-right' });
+            window.toast('Grafik Direset', { type: 'info', position: 'top-right', description: 'Grafik dan tabel kesimpulan telah direset.', saveToDb: false });
         }
 
 
@@ -1544,6 +1720,222 @@
              window.toast('Mode Edit Dibatalkan', { type: 'info', position: 'top-right' });
          }
 
+         // --- Fungsi untuk Notifikasi ---
+         async function saveNotificationToFirestore(message, options) {
+             if (!db) return; // Jangan simpan jika DB tidak siap
+
+             const notificationData = {
+                 message: message,
+                 description: options.description || '',
+                 type: options.type || 'default',
+                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
+             };
+
+             try {
+                 await db.collection(notificationsCollection).add(notificationData);
+                 console.log("Notifikasi disimpan ke Firestore:", notificationData);
+                 fetchAndUpdateNotificationBadge(); // Update badge setelah menyimpan
+             } catch (error) {
+                 console.error("Error saving notification to Firestore:", error);
+             }
+         }
+
+         async function fetchAndUpdateNotificationBadge() {
+             if (!db || !notificationBadge) return;
+             try {
+                 const querySnapshot = await db.collection(notificationsCollection).get();
+                 const count = querySnapshot.size;
+                 updateNotificationBadge(count);
+             } catch (error) {
+                 console.error("Error fetching notification count:", error);
+             }
+         }
+
+         // *** PERBAIKAN: Logika update badge ***
+         function updateNotificationBadge(count) {
+             if (!notificationBadge) return;
+             if (count > 0) {
+                 notificationBadge.textContent = count > 99 ? '99+' : count;
+                 notificationBadge.classList.remove('hidden');
+             } else {
+                 notificationBadge.textContent = '0'; // Set ke 0
+                 notificationBadge.classList.add('hidden'); // Sembunyikan jika 0
+             }
+         }
+
+
+         async function openNotificationModal() {
+            if (!db) { window.toast('Firestore Error', { description: 'Tidak dapat memuat notifikasi: Firestore tidak terinisialisasi.', type: 'danger', position: 'top-center' }); return; }
+            notificationModal.classList.remove('hidden');
+            // Tampilkan spinner
+            notificationListDiv.innerHTML = `
+                <div class="flex flex-col justify-center items-center h-32">
+                    <div class="loader mb-4"></div>
+                    <p class="shimmer-text text-gray-500 text-sm">Memuat notifikasi...</p>
+                </div>
+            `;
+
+            try {
+                const querySnapshot = await db.collection(notificationsCollection).orderBy("timestamp", "desc").limit(50).get(); // Batasi jumlah notif
+                displayNotifications(querySnapshot);
+                updateNotificationBadge(querySnapshot.size); // Update badge saat modal dibuka
+            } catch (error) {
+                 console.error("Error fetching notifications:", error);
+                 notificationListDiv.innerHTML = `<p class="text-red-600 text-center p-4">Gagal memuat notifikasi: ${error.message}</p>`;
+            }
+         }
+
+         function displayNotifications(querySnapshot) {
+             notificationListDiv.innerHTML = ''; // Hapus loading/konten lama
+             if (querySnapshot.empty) {
+                 notificationListDiv.innerHTML = '<p class="text-center text-gray-500 p-4">Tidak ada notifikasi.</p>';
+                 return;
+             }
+
+             querySnapshot.forEach(doc => {
+                const data = doc.data();
+                const docId = doc.id;
+
+                const card = document.createElement('div');
+                card.className = 'notification-card';
+                // Tambahkan kelas border berdasarkan tipe
+                switch (data.type) {
+                    case 'success': card.classList.add('notification-card-success'); break;
+                    case 'info': card.classList.add('notification-card-info'); break;
+                    case 'warning': card.classList.add('notification-card-warning'); break;
+                    case 'danger': card.classList.add('notification-card-danger'); break;
+                    default: card.classList.add('notification-card-default'); break;
+                }
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'notification-card-content';
+
+                const messageP = document.createElement('p');
+                messageP.className = 'notification-card-message';
+                messageP.textContent = data.message;
+                contentDiv.appendChild(messageP);
+
+                if (data.description) {
+                    const descriptionP = document.createElement('p');
+                    descriptionP.className = 'notification-card-description';
+                    descriptionP.textContent = data.description;
+                    contentDiv.appendChild(descriptionP);
+                }
+
+                const timeP = document.createElement('p');
+                timeP.className = 'notification-card-time';
+                timeP.textContent = formatFirestoreTimestamp(data.timestamp);
+                contentDiv.appendChild(timeP);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'notification-delete-btn';
+                deleteBtn.innerHTML = '&times;'; // Karakter 'x'
+                deleteBtn.title = 'Hapus notifikasi ini';
+                deleteBtn.onclick = (event) => {
+                    event.stopPropagation(); // Cegah event lain
+                    openDeleteNotificationConfirmModal(docId, card);
+                };
+
+                card.appendChild(contentDiv);
+                card.appendChild(deleteBtn);
+                notificationListDiv.appendChild(card);
+             });
+         }
+
+         function closeNotificationModal() {
+             notificationModal.classList.add('hidden');
+         }
+
+        function openDeleteNotificationConfirmModal(docId, cardElement) {
+            notificationDocIdToDelete = docId;
+            notificationElementToDelete = cardElement;
+            deleteNotificationConfirmMessage.textContent = `Apakah Anda yakin ingin menghapus notifikasi ini?`;
+            deleteNotificationConfirmModal.classList.remove('hidden');
+        }
+
+        function closeDeleteNotificationConfirmModal() {
+            deleteNotificationConfirmModal.classList.add('hidden');
+            notificationDocIdToDelete = null;
+            notificationElementToDelete = null;
+        }
+
+        async function executeDeleteNotification() {
+            if (!notificationDocIdToDelete || !notificationElementToDelete) return;
+            const docId = notificationDocIdToDelete;
+            const element = notificationElementToDelete;
+
+            confirmDeleteNotificationBtn.disabled = true;
+            cancelDeleteNotificationBtn.disabled = true;
+            confirmDeleteNotificationBtn.textContent = 'Menghapus...';
+
+            if (!db) {
+                window.toast('Firestore Error', { description: 'Firestore tidak terinisialisasi.', type: 'danger', saveToDb: false });
+                closeDeleteNotificationConfirmModal();
+                 confirmDeleteNotificationBtn.disabled = false; cancelDeleteNotificationBtn.disabled = false; confirmDeleteNotificationBtn.textContent = 'Ya, Hapus';
+                return;
+            }
+
+            try {
+                await db.collection(notificationsCollection).doc(docId).delete();
+                element.remove();
+                window.toast('Sukses', { description: 'Notifikasi berhasil dihapus.', type: 'success', saveToDb: false });
+
+                // *** PERBAIKAN: Update badge berdasarkan jumlah elemen DOM ***
+                const remainingNotificationElements = notificationListDiv.querySelectorAll('.notification-card');
+                updateNotificationBadge(remainingNotificationElements.length);
+
+                 if (remainingNotificationElements.length === 0) {
+                     notificationListDiv.innerHTML = '<p class="text-center text-gray-500 p-4">Tidak ada notifikasi.</p>';
+                 }
+            } catch (error) {
+                console.error("Error deleting notification:", error);
+                window.toast('Gagal Hapus', { description: `Gagal menghapus notifikasi: ${error.message}`, type: 'danger', saveToDb: false });
+            } finally {
+                closeDeleteNotificationConfirmModal();
+                confirmDeleteNotificationBtn.disabled = false; cancelDeleteNotificationBtn.disabled = false; confirmDeleteNotificationBtn.textContent = 'Ya, Hapus';
+            }
+        }
+
+        function openClearAllNotificationsConfirmModal() {
+            clearAllNotificationsConfirmModal.classList.remove('hidden');
+        }
+
+        function closeClearAllNotificationsConfirmModal() {
+             clearAllNotificationsConfirmModal.classList.add('hidden');
+        }
+
+        async function executeClearAllNotifications() {
+            confirmClearAllNotificationsBtn.disabled = true;
+            cancelClearAllNotificationsBtn.disabled = true;
+            confirmClearAllNotificationsBtn.textContent = 'Menghapus...';
+
+             if (!db) {
+                window.toast('Firestore Error', { description: 'Firestore tidak terinisialisasi.', type: 'danger', saveToDb: false });
+                closeClearAllNotificationsConfirmModal();
+                 confirmClearAllNotificationsBtn.disabled = false; cancelClearAllNotificationsBtn.disabled = false; confirmClearAllNotificationsBtn.textContent = 'Ya, Hapus Semua';
+                return;
+            }
+
+            try {
+                const querySnapshot = await db.collection(notificationsCollection).get();
+                const batch = db.batch();
+                querySnapshot.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                notificationListDiv.innerHTML = '<p class="text-center text-gray-500 p-4">Tidak ada notifikasi.</p>';
+                window.toast('Sukses', { description: 'Semua notifikasi berhasil dihapus.', type: 'success', saveToDb: false });
+                updateNotificationBadge(0); // Update badge setelah menghapus semua
+            } catch (error) {
+                 console.error("Error clearing all notifications:", error);
+                 window.toast('Gagal Hapus Semua', { description: `Gagal menghapus semua notifikasi: ${error.message}`, type: 'danger', saveToDb: false });
+            } finally {
+                 closeClearAllNotificationsConfirmModal();
+                 confirmClearAllNotificationsBtn.disabled = false; cancelClearAllNotificationsBtn.disabled = false; confirmClearAllNotificationsBtn.textContent = 'Ya, Hapus Semua';
+            }
+        }
+
+
         // --- Event Listeners ---
         addParameterBtn.addEventListener('click', () => addParameterInput());
         addModelBtn.addEventListener('click', () => addModelInput());
@@ -1559,6 +1951,41 @@
             closeDeleteConfirmModalBtn.addEventListener('click', closeDeleteConfirmModal);
         }
         deleteConfirmModal.addEventListener('click', (event) => { if (event.target === deleteConfirmModal) { closeDeleteConfirmModal(); } }); // Klik luar modal hapus
+
+        // Event Listener Notifikasi
+        if (viewNotificationBtn) {
+             viewNotificationBtn.addEventListener('click', openNotificationModal);
+        }
+        if (closeNotificationModalBtn) {
+            closeNotificationModalBtn.addEventListener('click', closeNotificationModal);
+        }
+        if (notificationModal) {
+            notificationModal.addEventListener('click', (event) => { if (event.target === notificationModal) { closeNotificationModal(); } });
+        }
+         if (clearAllNotificationsBtn) {
+            clearAllNotificationsBtn.addEventListener('click', openClearAllNotificationsConfirmModal);
+        }
+        // Listener untuk modal konfirmasi hapus notifikasi
+        if (cancelDeleteNotificationBtn) {
+            cancelDeleteNotificationBtn.addEventListener('click', closeDeleteNotificationConfirmModal);
+        }
+        if (confirmDeleteNotificationBtn) {
+            confirmDeleteNotificationBtn.addEventListener('click', executeDeleteNotification);
+        }
+        if (deleteNotificationConfirmModal) {
+             deleteNotificationConfirmModal.addEventListener('click', (event) => { if (event.target === deleteNotificationConfirmModal) { closeDeleteNotificationConfirmModal(); } });
+        }
+         // Listener untuk modal konfirmasi hapus semua notifikasi
+         if (cancelClearAllNotificationsBtn) {
+             cancelClearAllNotificationsBtn.addEventListener('click', closeClearAllNotificationsConfirmModal);
+         }
+         if (confirmClearAllNotificationsBtn) {
+             confirmClearAllNotificationsBtn.addEventListener('click', executeClearAllNotifications);
+         }
+         if (clearAllNotificationsConfirmModal) {
+             clearAllNotificationsConfirmModal.addEventListener('click', (event) => { if (event.target === clearAllNotificationsConfirmModal) { closeClearAllNotificationsConfirmModal(); } });
+         }
+
 
         // --- Inisialisasi Awal ---
         document.addEventListener('DOMContentLoaded', () => {
