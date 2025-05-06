@@ -27,6 +27,16 @@
         .scores-container {
             padding-top: 0.5rem;
             border-top: 1px solid #f3f4f6;
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding-top 0.3s ease-out, border-top 0.3s ease-out; /* Transisi untuk collapsible */
+            overflow: hidden; /* Sembunyikan konten saat collapsed */
+            max-height: 1000px; /* Set tinggi maks yang besar saat terlihat */
+        }
+        .scores-container.hidden {
+             max-height: 0 !important; /* Paksa tinggi 0 saat tersembunyi */
+             padding-top: 0 !important;
+             border-top: none !important;
+             opacity: 0 !important;
+             /* Tambahkan !important untuk memastikan override */
         }
         .score-input-group { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 80px; }
         .score-input-group label { font-size: 0.75rem; color: #6b7280; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; display: block; cursor: default; }
@@ -173,8 +183,36 @@
             justify-content: center;
             align-items: center;
         }
-        /* Hapus gaya spinner CSS lama */
-        /* #preloader .spinner { ... } */
+
+        /* Gaya untuk Progress Bar Toast */
+        .toast-progress-wrapper {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px; /* Tinggi progress bar */
+            background-color: #e5e7eb; /* Warna background bar */
+            overflow: hidden; /* Sembunyikan bagian progress yang keluar */
+             border-bottom-left-radius: 0.375rem; /* Sesuaikan dengan radius toast */
+             border-bottom-right-radius: 0.375rem;
+        }
+        .toast-progress {
+            height: 100%;
+            background-color: #3b82f6; /* Warna progress (biru) */
+            width: 100%; /* Mulai dari 100% */
+            /* Animasi akan ditambahkan/dihapus oleh JS */
+        }
+        .toast-progress.animate {
+            animation: shrinkWidth 4s linear forwards; /* Durasi 4 detik */
+        }
+        .toast-progress.paused {
+            animation-play-state: paused;
+        }
+
+        @keyframes shrinkWidth {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
 
 
         [x-cloak] { display: none !important; }
@@ -338,50 +376,86 @@
                 <template x-for="(toast, index) in toasts" :key="toast.id">
                     <li
                         :id="toast.id"
-                        x-data="{ toastHovered: false }"
+                        x-data="{
+                            toastHovered: false,
+                            isPaused: false, // *** BARU: Flag untuk status jeda ***
+                            startTime: 0,
+                            initialDuration: 4000, // Durasi awal dalam ms
+                            remainingTime: 4000,
+                            autoHideTimeout: null,
+                            progressBar: null,
+
+                            startHideTimer(duration) {
+                                clearTimeout(this.autoHideTimeout);
+                                this.autoHideTimeout = setTimeout(() => {
+                                    // Hanya burn jika tidak dijeda (tidak dihover)
+                                    if (!this.isPaused) {
+                                        burnToast(toast.id);
+                                    }
+                                }, duration);
+                            },
+                            pause() {
+                                if (this.isPaused) return; // Jangan lakukan apa-apa jika sudah dijeda
+                                this.isPaused = true;
+                                clearTimeout(this.autoHideTimeout); // Hapus timer
+                                const elapsed = Date.now() - this.startTime;
+                                this.remainingTime -= elapsed;
+                                if (this.remainingTime < 0) this.remainingTime = 0; // Pastikan tidak negatif
+                                if (this.progressBar) this.progressBar.classList.add('paused'); // Jeda animasi CSS
+                                console.log(`Toast [${toast.id}]: Paused. Remaining: ${this.remainingTime}ms`);
+                            },
+                            resume() {
+                                if (!this.isPaused) return; // Jangan lakukan apa-apa jika tidak dijeda
+                                this.isPaused = false;
+                                this.startTime = Date.now(); // Reset waktu mulai untuk jeda berikutnya
+                                if (this.progressBar) this.progressBar.classList.remove('paused'); // Lanjutkan animasi CSS
+                                this.startHideTimer(this.remainingTime); // Mulai timer baru dengan sisa waktu
+                                console.log(`Toast [${toast.id}]: Resumed. Starting timer for ${this.remainingTime}ms`);
+                            }
+                        }"
                         x-init="
                             let el = $el;
+                            progressBar = el.querySelector('.toast-progress');
+
+                            // Atur posisi awal dan animasi masuk
                             if(position.includes('bottom')){ el.firstElementChild.classList.add('toast-bottom'); el.firstElementChild.classList.add('opacity-0', 'translate-y-full'); }
                             else { el.firstElementChild.classList.add('opacity-0', '-translate-y-full'); }
-                            setTimeout(function(){
-                                setTimeout(function(){
+                            setTimeout(() => {
+                                setTimeout(() => {
                                     if(el.firstElementChild){
                                         if(position.includes('bottom')){ el.firstElementChild.classList.remove('opacity-0', 'translate-y-full'); }
                                         else { el.firstElementChild.classList.remove('opacity-0', '-translate-y-full'); }
                                         el.firstElementChild.classList.add('opacity-100', 'translate-y-0');
+                                        if (progressBar) {
+                                            progressBar.classList.add('animate'); // Mulai animasi CSS
+                                            startTime = Date.now(); // Set waktu mulai
+                                            startHideTimer(initialDuration); // Mulai timer JS awal
+                                        } else {
+                                            startHideTimer(initialDuration); // Fallback jika progress bar tidak ada
+                                        }
                                     }
-                                    setTimeout(function(){ stackToasts(); }, 10);
+                                    setTimeout(() => stackToasts(), 10);
                                 }, 5);
                             }, 50);
-                            setTimeout(function(){
-                                if (!toastHovered) {
-                                    setTimeout(function(){
-                                        if(el.firstElementChild){
-                                            el.firstElementChild.classList.remove('opacity-100');
-                                            el.firstElementChild.classList.add('opacity-0');
-                                            if(toasts.length == 1){
-                                                el.firstElementChild.classList.remove('translate-y-0');
-                                                if(position.includes('bottom')){ el.firstElementChild.classList.add('translate-y-full'); }
-                                                else { el.firstElementChild.classList.add('-translate-y-full'); }
-                                            }
-                                        }
-                                        setTimeout(function(){ deleteToastWithId(toast.id); }, 300);
-                                    }, 5);
-                                }
-                            }, 4000);
+
+                             // Watcher untuk hover pada item toast
+                             $watch('toastHovered', (value) => {
+                                if (value || toastsHovered) { pause(); } else { resume(); }
+                             });
+                             // Watcher untuk hover pada container toast
+                             $watch('toastsHovered', (value) => {
+                                if (value || toastHovered) { pause(); } else { resume(); }
+                             });
                         "
                         @mouseover="toastHovered=true"
                         @mouseout="toastHovered=false"
-                        class="absolute w-full duration-300 ease-out select-none sm:max-w-xs transition-all"
-                        :class="{ 'toast-no-description': !toast.description }"
+                        class="absolute w-full duration-300 ease-out select-none sm:max-w-xs transition-all overflow-hidden sm:rounded-md" :class="{ 'toast-no-description': !toast.description }"
                         >
                         <span
-                            class="relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full transition-all duration-300 ease-out bg-white border border-gray-100 sm:rounded-md sm:max-w-xs group"
-                            :class="{ 'p-4' : !toast.html, 'p-0' : toast.html }"
-                        >
+                            class="relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full transition-all duration-300 ease-out bg-white border border-gray-100 group"
+                            :class="{ 'p-4 pb-5' : !toast.html, 'p-0 pb-1' : toast.html }" >
                             <template x-if="!toast.html">
-                                <div class="relative">
-                                    <div class="flex items-center"
+                                <div class="relative w-full pr-5"> <div class="flex items-center"
                                         :class="{ 'text-green-500' : toast.type=='success', 'text-blue-500' : toast.type=='info', 'text-orange-400' : toast.type=='warning', 'text-red-500' : toast.type=='danger', 'text-gray-800' : toast.type=='default' }">
                                         <svg x-show="toast.type=='success'" class="w-[18px] h-[18px] mr-1.5 -ml-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM16.7744 9.63269C17.1238 9.20501 17.0604 8.57503 16.6327 8.22559C16.2051 7.87615 15.5751 7.93957 15.2256 8.36725L10.6321 13.9892L8.65936 12.2524C8.24484 11.8874 7.61295 11.9276 7.248 12.3421C6.88304 12.7566 6.92322 13.3885 7.33774 13.7535L9.31046 15.4903C10.1612 16.2393 11.4637 16.1324 12.1808 15.2547L16.7744 9.63269Z" fill="currentColor"></path></svg>
                                         <svg x-show="toast.type=='info'" class="w-[18px] h-[18px] mr-1.5 -ml-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM12 9C12.5523 9 13 8.55228 13 8C13 7.44772 12.5523 7 12 7C11.4477 7 11 7.44772 11 8C11 8.55228 11.4477 9 12 9ZM13 12C13 11.4477 12.5523 11 12 11C11.4477 11 11 11.4477 11 12V16C11 16.5523 11.4477 17 12 17C12.5523 17 13 16.5523 13 16V12Z" fill="currentColor"></path></svg>
@@ -399,6 +473,9 @@
                                 :class="{ 'top-1/2 -translate-y-1/2 mr-2' : !toast.description && !toast.html, 'top-1.5 right-1.5' : (toast.description || toast.html), 'opacity-100' : toastHovered || toastsHovered, 'opacity-0' : !toastHovered && !toastsHovered }">
                                 <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                             </span>
+                             <div class="toast-progress-wrapper">
+                                <div class="toast-progress"></div>
+                            </div>
                         </span>
                     </li>
                 </template>
@@ -434,7 +511,9 @@
                                     <input type="text" name="modelName[]" placeholder="Nama Model (cth: Claude 3.7)" class="model-name p-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                                     <button type="button" class="remove-btn remove-model-btn" onclick="removeInputGroup(this, '#modelContainer', '.model-input-group')" title="Hapus Model">X</button>
                                 </div>
-                                <div class="scores-container"> </div>
+                                <button type="button" class="toggle-scores-btn w-full text-left text-sm text-indigo-600 hover:text-indigo-800 focus:outline-none mt-2" onclick="toggleScoresVisibility('model_initial_0')">
+                                    Input Skor Parameter &#9662; </button>
+                                <div id="scores_model_initial_0" class="scores-container hidden"> </div>
                             </div>
                         </div>
                          <button type="button" id="addModelBtn" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md transition duration-200 mt-3 text-sm md:text-base">Tambah Model</button>
@@ -599,7 +678,23 @@
              paramGroups.forEach((group, index) => { if (index > 0) group.remove(); else { group.dataset.paramId = generateUniqueId('param'); const input = group.querySelector('.parameter-name'); if (input) input.value = ''; } });
              if (parameterContainer.children.length === 0) addParameterInput();
              const modelGroups = modelContainer.querySelectorAll('.model-input-group');
-             modelGroups.forEach((group, index) => { if (index > 0) group.remove(); else { group.dataset.modelId = generateUniqueId('model'); const input = group.querySelector('.model-name'); if (input) input.value = ''; const scoresContainer = group.querySelector('.scores-container'); if (scoresContainer) scoresContainer.innerHTML = ''; } });
+             modelGroups.forEach((group, index) => {
+                 if (index > 0) {
+                     group.remove();
+                 } else {
+                     group.dataset.modelId = generateUniqueId('model');
+                     const input = group.querySelector('.model-name');
+                     if (input) input.value = '';
+                     const scoresContainer = group.querySelector('.scores-container');
+                     if (scoresContainer) {
+                         scoresContainer.innerHTML = '';
+                         // *** PERBAIKAN: Pastikan hidden saat reset ***
+                         scoresContainer.classList.add('hidden');
+                         const toggleBtn = group.querySelector('.toggle-scores-btn');
+                         if (toggleBtn) toggleBtn.innerHTML = 'Input Skor Parameter &#9662;'; // Reset teks tombol
+                     }
+                 }
+             });
              if (modelContainer.children.length === 0) addModelInput();
              updateModelInputs(); // Ini akan memanggil updateModelInputsForGroup
              updateRemoveButtons('#parameterContainer', '.parameter-input-group');
@@ -652,6 +747,7 @@
             updateModelInputs();
             return newInputGroup;
         }
+        // Modifikasi addModelInput untuk collapsible
         function addModelInput(initialValue = '', existingModelId = null) {
             const modelId = existingModelId || generateUniqueId('model');
             const newInputGroup = document.createElement('div');
@@ -662,12 +758,33 @@
                     <input type="text" name="modelName[]" placeholder="Nama Model" class="model-name p-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required value="${initialValue}">
                     <button type="button" class="remove-btn remove-model-btn" onclick="removeInputGroup(this, '#modelContainer', '.model-input-group')" title="Hapus Model">X</button>
                 </div>
-                <div class="scores-container"></div>`; // Kelas grid ditambahkan oleh JS
+                <button type="button" class="toggle-scores-btn w-full text-left text-sm text-indigo-600 hover:text-indigo-800 focus:outline-none mt-2" onclick="toggleScoresVisibility('${modelId}')">
+                    Input Skor Parameter &#9662; </button>
+                <div id="scores_${modelId}" class="scores-container hidden"></div>`; // Tambahkan ID dan kelas hidden
             modelContainer.appendChild(newInputGroup);
             updateModelInputsForGroup(newInputGroup, null);
             updateRemoveButtons('#modelContainer', '.model-input-group');
             return newInputGroup;
         }
+
+        // Fungsi untuk toggle visibilitas skor
+        function toggleScoresVisibility(modelId) {
+            const scoresContainer = document.getElementById(`scores_${modelId}`);
+            const toggleBtn = event ? event.currentTarget : document.querySelector(`[onclick*="toggleScoresVisibility('${modelId}')"]`);
+            if (scoresContainer && toggleBtn) {
+                const isHidden = scoresContainer.classList.toggle('hidden');
+                // Ubah teks tombol dan panah
+                if (isHidden) {
+                    toggleBtn.innerHTML = 'Input Skor Parameter &#9662;'; // Panah bawah
+                } else {
+                    toggleBtn.innerHTML = 'Sembunyikan Skor &#9652;'; // Panah atas
+                }
+            } else {
+                console.error(`Could not find scores container or toggle button for model ID: ${modelId}`);
+            }
+        }
+
+
         // Update semua input skor di semua model
         function updateModelInputs() {
             const modelGroups = modelContainer.querySelectorAll('.model-input-group');
@@ -689,13 +806,21 @@
             if (!scoresContainer) return;
             const modelId = modelGroup.dataset.modelId;
 
-                        // *** PERUBAHAN: Tentukan kelas grid berdasarkan jumlah parameter ***
-                        const parameterCount = parameterContainer.querySelectorAll('.parameter-input-group').length;
-                        if (parameterCount > 1) {
-                            scoresContainer.className = 'scores-container grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4'; // 2 kolom jika > 1 param
-                        } else {
-                            scoresContainer.className = 'scores-container grid grid-cols-1 gap-3'; // 1 kolom jika 1 param
-                        }
+            // Terapkan kelas grid responsif dinamis
+            const parameterCount = parameterContainer.querySelectorAll('.parameter-input-group').length;
+            let gridClasses = 'grid gap-3 '; // Base grid classes
+            if (parameterCount > 1) {
+                gridClasses += 'grid-cols-1 md:grid-cols-2 md:gap-4'; // 2 kolom di md+ jika > 1 param
+            } else {
+                gridClasses += 'grid-cols-1'; // 1 kolom jika 1 param
+            }
+            // Hanya tambahkan kelas grid, JANGAN sentuh 'hidden'
+            const wasHidden = scoresContainer.classList.contains('hidden'); // Simpan status hidden
+            scoresContainer.className = `scores-container ${gridClasses}`; // Terapkan kelas grid
+            if (wasHidden) {
+                scoresContainer.classList.add('hidden'); // Pastikan tetap hidden jika sebelumnya hidden
+            }
+
 
             if (!paramIdToNameMap) {
                 paramIdToNameMap = {};
@@ -1401,6 +1526,13 @@
                 const modelGroup = addModelInput(modelData.name, null); // Tambah model input
                 // Isi skor berdasarkan NAMA
                 updateModelInputsForGroup(modelGroup, modelData.scores, paramIdToNameMap); // scoresData sudah dalam format { namaParam: skor }
+                 // Tampilkan skor saat load edit
+                 const scoresContainer = modelGroup.querySelector('.scores-container');
+                 const toggleBtn = modelGroup.querySelector('.toggle-scores-btn');
+                 if (scoresContainer && toggleBtn) {
+                     scoresContainer.classList.remove('hidden');
+                     toggleBtn.innerHTML = 'Sembunyikan Skor &#9652;'; // Panah atas
+                 }
             });
 
             updateRemoveButtons('#parameterContainer', '.parameter-input-group');
