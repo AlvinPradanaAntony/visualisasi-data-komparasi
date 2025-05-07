@@ -1,0 +1,489 @@
+/* Gaya CSS */
+.parameter-input-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb;
+  background-color: #fff;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+.parameter-input-group input[type="text"] {
+  flex-grow: 1;
+  min-width: 150px;
+  border: 1px solid #d1d5db;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+.model-input-group {
+  padding: 0.75rem;
+  border: 1px solid #e5e7eb;
+  background-color: #fff;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.model-name-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.model-name-row input[type="text"] {
+  flex-grow: 1;
+  min-width: 150px;
+  border: 1px solid #d1d5db;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+/* Gaya scores-container diatur oleh JS dengan grid, tapi tambahkan padding/border di sini */
+.scores-container {
+  padding-top: 0.5rem;
+  border-top: 1px solid #f3f4f6;
+  transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding-top 0.3s ease-out, border-top 0.3s ease-out;
+  overflow: hidden;
+  max-height: 1000px;
+}
+.scores-container.hidden {
+  max-height: 0 !important;
+  padding-top: 0 !important;
+  border-top: none !important;
+  opacity: 0 !important;
+}
+.score-input-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 80px;
+}
+.score-input-group label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+  display: block;
+  cursor: default;
+}
+.score-input-group input[type="number"] {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  text-align: center;
+  font-size: 0.875rem; /* Ukuran font input */
+}
+/* Penyesuaian Chart Container untuk responsivitas */
+#chartContainer {
+  width: 100%; /* Lebar penuh mengikuti kolom */
+  min-height: 300px; /* Tinggi minimal */
+  height: 50vh; /* Tinggi relatif terhadap viewport */
+  max-height: 450px; /* Batas tinggi maksimum */
+  margin: 1rem auto;
+  border: 1px solid #ccc;
+  display: block; /* Pastikan block untuk width 100% */
+}
+@media (min-width: 1024px) {
+  /* lg breakpoint */
+  #chartContainer {
+    height: 65vh; /* Tinggi lebih besar di desktop */
+    max-height: none; /* Hapus batas tinggi maks di desktop */
+  }
+}
+.remove-btn {
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  background-color: #ef4444;
+  color: white;
+  border-radius: 0.375rem;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+.remove-btn:hover {
+  background-color: #dc2626;
+}
+.remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.drag-handle {
+  cursor: grab;
+  padding: 0.5rem;
+  margin-right: 0.5rem;
+  color: #9ca3af;
+  user-select: none;
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.parameter-input-group.dragging {
+  opacity: 0.4;
+  background-color: #e0e7ff;
+  border-style: dashed;
+}
+.drag-over-target {
+  position: relative;
+}
+.drag-over-target::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background-color: #4f46e5;
+  border-radius: 2px;
+  z-index: 10;
+}
+.drag-over-target.drop-after::before {
+  top: auto;
+  bottom: -4px;
+}
+.hidden {
+  display: none !important;
+} /* Pastikan !important untuk override */
+
+/* Gaya Modal Umum */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 50;
+}
+.modal-content {
+  background-color: white;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+/* Gaya Tombol Tutup Modal */
+.modal-close-btn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background-color: #ef4444; /* red-500 */
+  color: white;
+  border: none;
+  border-radius: 50%; /* Lingkaran */
+  width: 1.75rem; /* Ukuran tetap */
+  height: 1.75rem;
+  font-size: 1rem; /* Sesuaikan ukuran 'x' */
+  line-height: 1.75rem; /* Pusatkan 'x' secara vertikal */
+  text-align: center; /* Pusatkan 'x' secara horizontal */
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.modal-close-btn:hover {
+  background-color: #dc2626; /* red-600 */
+}
+
+/* Gaya Item Histori */
+.history-item-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.history-item {
+  flex-grow: 1;
+  padding: 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.history-item:hover {
+  background-color: #f3f4f6;
+}
+.history-item-time {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+.history-item-models {
+  font-size: 0.9rem;
+  color: #374151;
+  margin-top: 0.25rem;
+}
+/* Gaya untuk nama histori dan input editnya */
+.history-entry-name {
+  font-size: 1rem; /* Sedikit lebih besar */
+  font-weight: 600; /* Semi-bold */
+  color: #1f2937; /* Darker gray */
+  margin-bottom: 0.25rem;
+  cursor: text; /* Indikasi bisa diedit */
+  display: block; /* Agar bisa diklik */
+  padding: 2px 4px; /* Sedikit padding */
+  border-radius: 0.25rem;
+  transition: background-color 0.2s;
+}
+.history-entry-name:hover {
+  background-color: #f9fafb; /* Light hover */
+}
+.history-name-input {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  padding: 2px 4px;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  width: calc(100% - 8px); /* Sesuaikan lebar */
+  box-sizing: border-box;
+  margin-bottom: 0.25rem;
+}
+.history-name-input:focus {
+  outline: none;
+  border-color: #4f46e5; /* Indigo */
+  box-shadow: 0 0 0 1px #4f46e5;
+}
+
+.history-action-btn {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+.history-edit-btn {
+  background-color: #60a5fa;
+}
+.history-edit-btn:hover {
+  background-color: #3b82f6;
+}
+.history-delete-btn {
+  background-color: #f87171;
+}
+.history-delete-btn:hover {
+  background-color: #ef4444;
+}
+
+/* Gaya Modal Konfirmasi Hapus */
+#deleteConfirmModal .modal-content {
+  max-width: 400px;
+}
+.confirm-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+/* Gaya untuk Spinner Loading */
+.loader {
+  border: 4px solid #f3f3f3; /* Light grey */
+  border-top: 4px solid #3498db; /* Blue */
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  /* Dihapus margin auto agar bisa flex */
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Gaya untuk efek shimmer */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(to right, #b0b0b0 20%, #d0d0d0 50%, #b0b0b0 80%); /* Warna lebih gelap agar kontras */
+  background-size: 2000px 100%;
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text; /* Untuk Safari/Chrome */
+  animation: shimmer 2s linear infinite;
+  display: inline-block; /* Diperlukan untuk background-clip: text */
+}
+
+/* Gaya Preloader */
+#preloader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #ffffff; /* Warna background preloader */
+  z-index: 9999; /* Pastikan di atas konten lain */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Gaya untuk Progress Bar Toast */
+.toast-progress-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 4px; /* Tinggi progress bar */
+  background-color: #e5e7eb; /* Warna background bar */
+  overflow: hidden; /* Sembunyikan bagian progress yang keluar */
+  border-bottom-left-radius: 0.375rem; /* Sesuaikan dengan radius toast */
+  border-bottom-right-radius: 0.375rem;
+}
+.toast-progress {
+  height: 100%;
+  background-color: #3b82f6; /* Warna progress (biru) */
+  width: 100%; /* Mulai dari 100% */
+  /* Animasi akan ditambahkan/dihapus oleh JS */
+}
+.toast-progress.animate {
+  animation: shrinkWidth 4s linear forwards; /* Durasi 4 detik */
+}
+.toast-progress.paused {
+  animation-play-state: paused;
+}
+
+@keyframes shrinkWidth {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* Gaya untuk Kartu Notifikasi */
+.notification-card {
+  border-radius: 0.375rem; /* rounded-md */
+  padding: 0.75rem; /* p-3 */
+  margin-bottom: 0.5rem; /* mb-2 */
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+}
+.notification-card-content {
+  flex-grow: 1;
+  margin-right: 1rem; /* Jarak dari tombol hapus */
+}
+.notification-card-message {
+  font-weight: 500; /* medium */
+  margin-bottom: 0.25rem; /* mb-1 */
+}
+.notification-card-description {
+  font-size: 0.875rem; /* text-sm */
+  color: #6b7280; /* text-gray-500 */
+  margin-bottom: 0.25rem; /* mb-1 */
+}
+.notification-card-time {
+  font-size: 0.75rem; /* text-xs */
+  color: #9ca3af; /* text-gray-400 */
+}
+.notification-delete-btn {
+  background: none;
+  border: none;
+  color: #9ca3af; /* text-gray-400 */
+  cursor: pointer;
+  padding: 0.25rem; /* p-1 */
+  line-height: 1;
+  transition: color 0.2s;
+  flex-shrink: 0; /* Agar tombol tidak mengecil */
+}
+.notification-delete-btn:hover {
+  color: #ef4444; /* text-red-500 */
+}
+/* Warna border kiri berdasarkan tipe */
+.notification-card-success {
+  border-left: 4px solid #10b981; /* green-500 */
+  background-color: #f0fdf4; /* green-50 */
+}
+.notification-card-info {
+  border-left: 4px solid #3b82f6; /* blue-500 */
+  background-color: #eff6ff; /* blue-50 */
+}
+.notification-card-warning {
+  border-left: 4px solid #f59e0b; /* amber-500 */
+  background-color: #fffbeb; /* amber-50 */
+}
+.notification-card-danger {
+  border-left: 4px solid #ef4444; /* red-500 */
+  background-color: #fef2f2; /* red-50 */
+}
+.notification-card-default {
+  border-left: 4px solid #6b7280; /* gray-500 */
+  background-color: #f9fafb; /* gray-50 */
+}
+
+/* Gaya untuk FAB Notifikasi */
+#notificationFabContainer {
+  position: fixed;
+  bottom: 2rem; /* 8 (Tailwind) */
+  right: 2rem; /* 8 (Tailwind) */
+  z-index: 40; /* Di bawah modal tapi di atas konten lain */
+}
+#viewNotificationBtn {
+  background-color: #8b5cf6; /* purple-500 */
+  color: white;
+  width: 3.5rem; /* w-14 */
+  height: 3.5rem; /* h-14 */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s;
+}
+#viewNotificationBtn:hover {
+  background-color: #7c3aed; /* purple-600 */
+}
+/* *** PERBAIKAN: Hapus display:flex dari ID selector, pindahkan ke kelas Tailwind di HTML *** */
+#notificationBadge {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  background-color: #ef4444; /* red-500 */
+  color: white;
+  font-size: 0.75rem; /* text-xs */
+  font-weight: bold;
+  width: 1.25rem; /* w-5 */
+  height: 1.25rem; /* h-5 */
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+[x-cloak] {
+  display: none !important;
+}
