@@ -66,7 +66,7 @@
         .drag-over-target { position: relative; }
         .drag-over-target::before { content: ''; position: absolute; top: -4px; left: 0; right: 0; height: 4px; background-color: #4f46e5; border-radius: 2px; z-index: 10; }
         .drag-over-target.drop-after::before { top: auto; bottom: -4px; }
-        .hidden { display: none; }
+        .hidden { display: none !important; } /* Pastikan !important untuk override */
 
         /* Gaya Modal Umum */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 50; }
@@ -283,10 +283,11 @@
         #viewNotificationBtn:hover {
             background-color: #7c3aed; /* purple-600 */
         }
+        /* *** PERBAIKAN: Hapus display:flex dari ID selector, pindahkan ke kelas Tailwind di HTML *** */
         #notificationBadge {
             position: absolute;
-            top: -0.25rem; /* -top-1 */
-            right: -0.25rem; /* -right-1 */
+            top: -0.25rem;
+            right: -0.25rem;
             background-color: #ef4444; /* red-500 */
             color: white;
             font-size: 0.75rem; /* text-xs */
@@ -294,10 +295,7 @@
             width: 1.25rem; /* w-5 */
             height: 1.25rem; /* h-5 */
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 2px solid white; /* Border putih agar lebih menonjol */
+            border: 2px solid white;
         }
 
 
@@ -621,7 +619,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341A6.002 6.002 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            <span id="notificationBadge" class="hidden">0</span>
+            <span id="notificationBadge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white hidden">0</span>
         </button>
     </div>
 
@@ -975,7 +973,6 @@
             } else {
                 gridClasses += 'grid-cols-1'; // 1 kolom jika 1 param
             }
-            // Hanya tambahkan kelas grid, JANGAN sentuh 'hidden'
             const wasHidden = scoresContainer.classList.contains('hidden'); // Simpan status hidden
             scoresContainer.className = `scores-container ${gridClasses}`; // Terapkan kelas grid
             if (wasHidden) {
@@ -1751,15 +1748,14 @@
              }
          }
 
-         // *** PERBAIKAN: Logika update badge ***
          function updateNotificationBadge(count) {
              if (!notificationBadge) return;
              if (count > 0) {
                  notificationBadge.textContent = count > 99 ? '99+' : count;
                  notificationBadge.classList.remove('hidden');
              } else {
-                 notificationBadge.textContent = '0'; // Set ke 0
-                 notificationBadge.classList.add('hidden'); // Sembunyikan jika 0
+                 notificationBadge.textContent = '0';
+                 notificationBadge.classList.add('hidden');
              }
          }
 
@@ -1880,11 +1876,10 @@
                 element.remove();
                 window.toast('Sukses', { description: 'Notifikasi berhasil dihapus.', type: 'success', saveToDb: false });
 
-                // *** PERBAIKAN: Update badge berdasarkan jumlah elemen DOM ***
-                const remainingNotificationElements = notificationListDiv.querySelectorAll('.notification-card');
-                updateNotificationBadge(remainingNotificationElements.length);
+                // *** PERBAIKAN: Panggil fetchAndUpdateNotificationBadge setelah operasi DB selesai ***
+                await fetchAndUpdateNotificationBadge();
 
-                 if (remainingNotificationElements.length === 0) {
+                 if (notificationListDiv.querySelectorAll('.notification-card').length === 0) {
                      notificationListDiv.innerHTML = '<p class="text-center text-gray-500 p-4">Tidak ada notifikasi.</p>';
                  }
             } catch (error) {
