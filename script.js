@@ -637,7 +637,7 @@ async function updateDataInFirestore(docId, dataToUpdate) {
     window.toast("Update Error", { description: "ID Dokumen untuk update tidak ditemukan.", type: "danger", position: "top-center" });
     return;
   }
-  window.toast("Memperbarui...", { description: "Memperbarui data di Firebase...", type: "info", position: "top-center" });
+  window.toast("Memperbarui...", { description: "Memperbarui data di Firebase...", type: "info", position: "top-center",saveToDb: false });
 
   // Gunakan shallow copy untuk data storage
   const dataForStorage = { ...dataToUpdate };
@@ -1091,7 +1091,7 @@ function loadHistoryEntry(docId) {
     // Data sudah dalam format { scores: { paramName: value } }
     generateChartFromData(data, true); // Tampilkan grafik & tabel kesimpulan
     closeHistoryModal();
-    window.toast("Histori Dimuat", { description: `Menampilkan grafik dari histori (${formatFirestoreTimestamp(data.timestamp)})`, type: "info", position: "top-right" });
+    window.toast("Histori Dimuat", { description: `Menampilkan grafik dari histori (${formatFirestoreTimestamp(data.timestamp)})`, type: "info", position: "top-right",saveToDb: false });
     if (isEditMode) {
       cancelEdit();
     } // Keluar mode edit jika sedang aktif
@@ -1105,8 +1105,8 @@ function openDeleteConfirmModal(docId) {
   if (!docId) return;
   docIdToDelete = docId;
   const data = historicalDataCache[docId];
-  const timeString = data ? formatFirestoreTimestamp(data.timestamp) : `ID: ${docId}`;
-  deleteConfirmMessage.textContent = `Apakah Anda yakin ingin menghapus data histori dari ${timeString}? Tindakan ini tidak dapat diurungkan.`;
+  const entryName = data ? data.entryName : `ID: ${docId}`;
+  deleteConfirmMessage.innerHTML = `Apakah Anda yakin ingin menghapus data histori dari <strong>${entryName}</strong>? Tindakan ini tidak dapat diurungkan.`;
   deleteConfirmModal.classList.remove("hidden");
 }
 function closeDeleteConfirmModal() {
@@ -1131,11 +1131,13 @@ async function executeDeleteHistoryEntry() {
   }
   try {
     await db.collection("benchmarkData").doc(docId).delete();
+    const data = historicalDataCache[docId];
+    const entryName = data ? data.entryName : `ID: ${docId}`;
     if (itemWrapperToRemove) {
       itemWrapperToRemove.remove();
     } // Hapus dari tampilan
     delete historicalDataCache[docId]; // Hapus dari cache
-    window.toast("Sukses", { description: "Data histori berhasil dihapus.", type: "success", position: "top-right" });
+    window.toast("Sukses", { description: `Data histori (${entryName}) berhasil dihapus.`, type: "success", position: "top-right" });
     if (historyListDiv.children.length === 0) {
       historyListDiv.innerHTML = '<p class="text-gray-500">Belum ada data histori.</p>';
     }
@@ -1201,7 +1203,7 @@ function loadDataForEdit(docId) {
   editModeInfo.classList.remove("hidden");
   generateChartFromData(data, true); // Tampilkan grafik & tabel kesimpulan
   closeHistoryModal();
-  window.toast("Mode Edit Aktif", { description: `Memuat data dari ${formatFirestoreTimestamp(data.timestamp)} untuk diedit.`, type: "info", position: "top-right" });
+  window.toast("Mode Edit Aktif", { description: `Memuat data dari ${formatFirestoreTimestamp(data.timestamp)} untuk diedit.`, type: "info", position: "top-right",saveToDb: false });
 }
 // Batal mode edit
 function cancelEdit() {

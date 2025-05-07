@@ -48,8 +48,6 @@
   padding-top: 0.5rem;
   border-top: 1px solid #f3f4f6;
   transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding-top 0.3s ease-out, border-top 0.3s ease-out;
-  overflow: hidden;
-  max-height: 1000px;
 }
 .scores-container.hidden {
   max-height: 0 !important;
@@ -179,25 +177,26 @@
   width: 90%;
   max-width: 600px;
   max-height: 80vh;
-  overflow-y: auto;
   position: relative;
 }
 /* Gaya Tombol Tutup Modal */
 .modal-close-btn {
   position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
+  top: -0.75rem;
+  right: -0.75rem;
   background-color: #ef4444; /* red-500 */
   color: white;
   border: none;
   border-radius: 50%; /* Lingkaran */
   width: 1.75rem; /* Ukuran tetap */
   height: 1.75rem;
-  font-size: 1rem; /* Sesuaikan ukuran 'x' */
-  line-height: 1.75rem; /* Pusatkan 'x' secara vertikal */
-  text-align: center; /* Pusatkan 'x' secara horizontal */
   cursor: pointer;
+  font-size: 1.25rem; /* Ukuran font */
   transition: background-color 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-bottom: 0.25rem; 
 }
 .modal-close-btn:hover {
   background-color: #dc2626; /* red-600 */
