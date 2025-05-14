@@ -303,7 +303,22 @@
               <div id="parameterContainer" class="space-y-2 mb-3">
                 <div class="parameter-input-group" draggable="true" data-param-id="param_initial_0">
                   <span class="drag-handle">☰</span>
-                  <input type="text" name="parameterName_param_initial_0" placeholder="Nama Parameter (cth: AIME 2024)" class="parameter-name p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" required oninput="handleParameterNameInput(this)" />
+                  <div class="parameter-input-wrapper">
+                    <input
+                      type="text"
+                      name="parameterName_param_initial_0"
+                      placeholder="Nama Parameter (cth: AIME 2024)"
+                      class="parameter-name p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
+                      oninput="handleParameterNameInput(this); filterParameterSuggestions(this);"
+                      onfocus="showParameterSuggestions(this);"
+                      onblur="hideParameterSuggestionsWithDelay(this);"
+                      autocomplete="off"
+                    />
+                    <div class="parameter-suggestions-container" id="suggestions_param_initial_0">
+                      <!-- Suggestions will be populated here -->
+                    </div>
+                  </div>
                   <button type="button" class="remove-btn remove-parameter-btn" onclick="removeInputGroup(this, '#parameterContainer', '.parameter-input-group', updateModelInputs)" title="Hapus Parameter">X</button>
                 </div>
               </div>

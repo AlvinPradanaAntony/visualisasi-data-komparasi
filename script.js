@@ -207,13 +207,28 @@ function updateRemoveButtons(containerSelector, groupSelector) {
 }
 function addParameterInput(initialValue = "", existingParamId = null) {
   const paramId = existingParamId || generateUniqueId("param");
+  const suggestionsId = `suggestions_${paramId}`;
   const newInputGroup = document.createElement("div");
   newInputGroup.className = "parameter-input-group";
   newInputGroup.setAttribute("draggable", "true");
   newInputGroup.dataset.paramId = paramId;
   newInputGroup.innerHTML = `
                 <span class="drag-handle">☰</span>
-                <input type="text" name="parameterName_${paramId}" placeholder="Nama Parameter" class="parameter-name p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" required oninput="handleParameterNameInput(this)" value="${initialValue}">
+                <div class="parameter-input-wrapper">
+                    <input type="text" 
+                           name="parameterName_${paramId}" 
+                           placeholder="Nama Parameter" 
+                           class="parameter-name p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                           required 
+                           oninput="handleParameterNameInput(this); filterParameterSuggestions(this);" 
+                           value="${initialValue}" 
+                           onfocus="showParameterSuggestions(this);" 
+                           onblur="hideParameterSuggestionsWithDelay(this);"
+                           autocomplete="off">
+                    <div class="parameter-suggestions-container" id="${suggestionsId}">
+                        <!-- Suggestions will be populated here -->
+                    </div>
+                </div>
                 <button type="button" class="remove-btn remove-parameter-btn" onclick="removeInputGroup(this, '#parameterContainer', '.parameter-input-group', updateModelInputs)" title="Hapus Parameter">X</button>
             `;
   parameterContainer.appendChild(newInputGroup);
@@ -803,35 +818,52 @@ function generateSummaryTable(chartData) {
                             <tr>
                                 <th scope="col" class="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">🌟 Kategori Terbaik</th>
                                 <th scope="col" class="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">🏆 Model Unggulan</th>
+                                <th scope="col" class="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">🏅 Peringkat Model</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">`;
 
   chartData.parameterNames.forEach((paramName) => {
-    let maxScore = -1;
-    let winners = [];
+    let modelsWithScores = chartData.models
+      .map((model) => {
+        const score = parseFloat(model.scores[paramName]);
+        return {
+          name: model.name,
+          score: isNaN(score) ? -1 : score, // Anggap -1 jika skor tidak valid
+        };
+      })
+      .filter((model) => model.score !== -1) // Hanya model dengan skor valid
+      .sort((a, b) => b.score - a.score); // Urutkan dari skor tertinggi
 
-    chartData.models.forEach((model) => {
-      // Pastikan skor adalah angka yang valid sebelum dibandingkan
-      const score = parseFloat(model.scores[paramName]);
-      if (!isNaN(score)) {
-        if (score > maxScore) {
-          maxScore = score;
-          winners = [model.name]; // Reset pemenang
-        } else if (score === maxScore) {
-          winners.push(model.name); // Tambah jika skor sama
-        }
-      }
-    });
+    let winners = [];
+    let maxScore = -1;
+    if (modelsWithScores.length > 0) {
+      maxScore = modelsWithScores[0].score;
+      winners = modelsWithScores.filter((model) => model.score === maxScore).map((m) => m.name);
+    }
+
+    let rankingHtml = "";
+    if (modelsWithScores.length > 0) {
+      const topModels = modelsWithScores.slice(0, 3);
+      const medals = ["🥇", "🥈", "🥉"];
+      rankingHtml = topModels
+        .map((model, index) => {
+          return `${medals[index] || ""} ${model.name} (${model.score.toFixed(2)}%)`;
+        })
+        .join("<br>");
+    } else {
+      rankingHtml = '<span class="italic text-gray-400">N/A</span>';
+    }
 
     // Tambahkan baris ke tabel dengan gaya baru
     tableHtml += `
                     <tr class="hover:bg-gray-50 transition-colors duration-150">
-                         <td class="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm font-medium text-gray-900">${paramName}</td>
+                        <td class="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm font-medium text-gray-900">${paramName}</td>
                         <td class="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-700">
                             ${maxScore === -1 ? '<span class="italic text-gray-400">N/A</span>' : winners.join(" / ")}
                             ${maxScore !== -1 ? ` <span class="text-xs text-gray-400">(${maxScore.toFixed(2)}%)</span>` : ""}
                         </td>
+                        <td class="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-700">${rankingHtml}</td>
                     </tr>`;
   });
 
@@ -896,6 +928,128 @@ function renderNewFusionChart(dataSource) {
 }
 
 // --- Fungsi untuk Histori ---
+
+let recentParameterNamesCache = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 menit
+
+async function getRecentParameterNames() {
+  const now = Date.now();
+  if (recentParameterNamesCache && (now - cacheTimestamp < CACHE_DURATION)) {
+    return recentParameterNamesCache;
+  }
+
+  if (!db) {
+    console.warn("Firestore tidak terinisialisasi. Tidak dapat mengambil nama parameter.");
+    return [];
+  }
+
+  try {
+    const querySnapshot = await db.collection("benchmarkData").orderBy("timestamp", "desc").limit(50).get(); // Ambil lebih banyak untuk variasi
+    const parameterNamesSet = new Set();
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data && Array.isArray(data.parameterNames)) {
+        data.parameterNames.forEach(name => {
+          if (typeof name === 'string' && name.trim() !== '') {
+            parameterNamesSet.add(name.trim());
+          }
+        });
+      }
+    });
+    recentParameterNamesCache = Array.from(parameterNamesSet);
+    cacheTimestamp = now;
+    return recentParameterNamesCache;
+  } catch (error) {
+    console.error("Error mengambil nama parameter dari histori:", error);
+    return [];
+  }
+}
+
+let activeSuggestionsContainer = null;
+
+async function showParameterSuggestions(inputElement) {
+  const wrapper = inputElement.closest(".parameter-input-wrapper");
+  if (!wrapper) return;
+  const suggestionsContainer = wrapper.querySelector(".parameter-suggestions-container");
+  if (!suggestionsContainer) return;
+
+  activeSuggestionsContainer = suggestionsContainer; // Set container aktif
+
+  const uniqueNames = await getRecentParameterNames();
+  suggestionsContainer.innerHTML = ""; // Kosongkan saran lama
+
+  if (uniqueNames.length === 0) {
+    const noSuggestionItem = document.createElement("div");
+    noSuggestionItem.className = "suggestion-item no-suggestions";
+    noSuggestionItem.textContent = "Tidak ada histori parameter.";
+    suggestionsContainer.appendChild(noSuggestionItem);
+  } else {
+    uniqueNames.forEach(name => {
+      const item = document.createElement("div");
+      item.className = "suggestion-item";
+      item.textContent = name;
+      item.onmousedown = (e) => { // Gunakan onmousedown agar blur tidak terjadi sebelum klik
+        e.preventDefault(); // Cegah blur pada input
+        inputElement.value = name;
+        handleParameterNameInput(inputElement); // Update label skor jika ada
+        filterParameterSuggestions(inputElement);
+      };
+      suggestionsContainer.appendChild(item);
+    });
+  }
+  suggestionsContainer.classList.add("active");
+  filterParameterSuggestions(inputElement); // Filter berdasarkan input saat ini (jika ada)
+}
+
+function hideParameterSuggestionsWithDelay(inputElement) {
+    // Delay kecil untuk memungkinkan event klik pada item saran diproses
+    setTimeout(() => {
+        const wrapper = inputElement.closest(".parameter-input-wrapper");
+        if (!wrapper) return;
+        const suggestionsContainer = wrapper.querySelector(".parameter-suggestions-container");
+        // Hanya sembunyikan jika mouse tidak di atas kontainer saran
+        if (suggestionsContainer && !suggestionsContainer.matches(':hover')) {
+            suggestionsContainer.classList.remove("active");
+            activeSuggestionsContainer = null;
+        }
+    }, 50);
+}
+
+function filterParameterSuggestions(inputElement) {
+  const filterText = inputElement.value.toLowerCase();
+  const wrapper = inputElement.closest(".parameter-input-wrapper");
+  if (!wrapper) return;
+  const suggestionsContainer = wrapper.querySelector(".parameter-suggestions-container");
+  if (!suggestionsContainer || !suggestionsContainer.classList.contains("active")) return;
+
+  const items = suggestionsContainer.querySelectorAll(".suggestion-item");
+  let hasVisibleItems = false;
+  items.forEach(item => {
+    if (item.classList.contains("no-suggestions")) return; // Jangan filter item 'no-suggestions'
+    const itemName = item.textContent.toLowerCase();
+    if (itemName.includes(filterText)) {
+      item.style.display = "";
+      hasVisibleItems = true;
+    } else {
+      item.style.display = "none";
+    }
+  });
+
+  // Tampilkan pesan jika tidak ada yang cocok setelah filter
+  let noMatchMsg = suggestionsContainer.querySelector(".no-match-message");
+  if (!hasVisibleItems && !suggestionsContainer.querySelector(".no-suggestions")) {
+    if (!noMatchMsg) {
+      noMatchMsg = document.createElement("div");
+      noMatchMsg.className = "suggestion-item no-match-message"; // Gunakan kelas yang sama untuk styling
+      noMatchMsg.textContent = "Tidak ada parameter yang cocok.";
+      suggestionsContainer.appendChild(noMatchMsg);
+    }
+    noMatchMsg.style.display = "";
+  } else if (noMatchMsg) {
+    noMatchMsg.style.display = "none";
+  }
+}
 
 // Fungsi untuk mengupdate nama histori di Firestore
 async function updateHistoryEntryName(docId, newName) {

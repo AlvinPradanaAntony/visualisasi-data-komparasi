@@ -19,6 +19,58 @@
   border-radius: 0.375rem;
   font-size: 0.875rem;
 }
+
+/* Wrapper untuk input parameter dan kontainer saran */
+.parameter-input-wrapper {
+  position: relative; /* Diperlukan untuk positioning absolut kontainer saran */
+  flex-grow: 1;
+  display: flex; /* Untuk memastikan input mengambil lebar penuh */
+}
+
+.parameter-input-wrapper input[type="text"] {
+  width: 100%; /* Input mengambil lebar penuh dari wrapper */
+}
+
+/* Kontainer untuk saran parameter */
+.parameter-suggestions-container {
+  position: absolute;
+  top: 100%; /* Muncul tepat di bawah input */
+  left: 0;
+  right: 0;
+  background-color: white;
+  border: 1px solid #d1d5db; /* Border yang sama dengan input */
+  border-top: none; /* Hapus border atas agar menyatu dengan input */
+  border-radius: 0 0 0.375rem 0.375rem; /* Radius hanya di sudut bawah */
+  z-index: 10; /* Pastikan muncul di atas elemen lain */
+  max-height: 200px; /* Batas tinggi maksimum, bisa di-scroll jika perlu */
+  overflow-y: auto;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: none; /* Sembunyikan secara default */
+}
+
+.parameter-suggestions-container.active {
+  display: block; /* Tampilkan saat aktif */
+}
+
+/* Item individual dalam kontainer saran */
+.suggestion-item {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.suggestion-item:hover {
+  background-color: #f3f4f6; /* Warna hover abu-abu muda */
+}
+
+.suggestion-item.no-suggestions,
+.suggestion-item.no-match-message {
+  color: #6b7280; /* Warna teks abu-abu untuk pesan khusus */
+  cursor: default;
+  background-color: white !important; /* Pastikan tidak ada hover effect */
+}
+
 .model-input-group {
   padding: 0.75rem;
   border: 1px solid #e5e7eb;
@@ -196,7 +248,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding-bottom: 0.25rem; 
+  padding-bottom: 0.25rem;
 }
 .modal-close-btn:hover {
   background-color: #dc2626; /* red-600 */
