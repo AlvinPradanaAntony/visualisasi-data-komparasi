@@ -327,10 +327,12 @@
 
             <div class="border p-4 rounded-md bg-gray-50">
               <h2 class="text-base md:text-lg font-semibold mb-3 text-gray-600">2. Input Model dan Skornya</h2>
+              <p class="text-xs md:text-sm text-gray-500 mb-3">Anda bisa mengubah urutan model dengan drag & drop ikon <span class="font-mono">☰</span>.</p>
               <p id="editModeInfo" class="text-sm text-blue-600 mb-3 hidden">Anda sedang mengedit data. Klik "Batal Edit" untuk kembali menambah data baru.</p>
               <div id="modelContainer" class="space-y-4">
-                <div class="model-input-group" data-model-id="model_initial_0">
+                <div class="model-input-group" draggable="true" data-model-id="model_initial_0">
                   <div class="model-name-row">
+                    <span class="drag-handle">☰</span>
                     <input type="text" name="modelName[]" placeholder="Nama Model (cth: Claude 3.7)" class="model-name p-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required />
                     <button type="button" class="remove-btn remove-model-btn" onclick="removeInputGroup(this, '#modelContainer', '.model-input-group')" title="Hapus Model">X</button>
                   </div>

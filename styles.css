@@ -188,6 +188,13 @@
   border-color: #4f46e5;
   border-width: 1.25px;
 }
+.model-input-group.dragging {
+  opacity: 0.4;
+  background-color: #e0e7ff;
+  border-style: dashed;
+  border-color: #4f46e5;
+  border-width: 1.25px;
+}
 .drag-over-target {
   position: relative;
 }

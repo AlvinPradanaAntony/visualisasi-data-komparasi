@@ -243,8 +243,10 @@ function addModelInput(initialValue = "", existingModelId = null) {
   const newInputGroup = document.createElement("div");
   newInputGroup.className = "model-input-group";
   newInputGroup.dataset.modelId = modelId;
+  newInputGroup.setAttribute("draggable", "true"); // Tambahkan draggable attribute
   newInputGroup.innerHTML = `
                 <div class="model-name-row">
+                    <span class="drag-handle">☰</span>
                     <input type="text" name="modelName[]" placeholder="Nama Model" class="model-name p-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required value="${initialValue}">
                     <button type="button" class="remove-btn remove-model-btn" onclick="removeInputGroup(this, '#modelContainer', '.model-input-group')" title="Hapus Model">X</button>
                 </div>
@@ -254,6 +256,7 @@ function addModelInput(initialValue = "", existingModelId = null) {
   modelContainer.appendChild(newInputGroup);
   updateModelInputsForGroup(newInputGroup, null);
   updateRemoveButtons("#modelContainer", ".model-input-group");
+  addDragDropListenersForModel(newInputGroup); // Tambahkan listeners untuk drag & drop
   return newInputGroup;
 }
 
@@ -384,10 +387,19 @@ function addDragDropListeners(element) {
   element.addEventListener("drop", handleDrop);
   element.addEventListener("dragend", handleDragEnd);
 }
+function addDragDropListenersForModel(element) {
+  element.addEventListener("dragstart", handleModelDragStart);
+  element.addEventListener("dragover", handleModelDragOver);
+  element.addEventListener("dragenter", handleModelDragEnter);
+  element.addEventListener("dragleave", handleModelDragLeave);
+  element.addEventListener("drop", handleModelDrop);
+  element.addEventListener("dragend", handleModelDragEnd);
+}
+
 function handleDragStart(e) {
   draggedItem = this;
   e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData("text/plain", this.dataset.paramId);
+  e.dataTransfer.setData("text/plain", this.dataset.paramId || this.dataset.modelId);
   setTimeout(() => {
     if (draggedItem) draggedItem.classList.add("dragging");
   }, 0);
@@ -443,7 +455,76 @@ function clearDropIndicator() {
   });
   dropTargetIndicator = null;
 }
+
+// --- Fungsi Drag and Drop untuk Model ---
+function handleModelDragStart(e) {
+  draggedItem = this;
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", this.dataset.modelId);
+  setTimeout(() => {
+    if (draggedItem) draggedItem.classList.add("dragging");
+  }, 0);
+}
+
+function handleModelDragOver(e) {
+  e.preventDefault();
+  if (!draggedItem || this === draggedItem) return;
+  const targetRect = this.getBoundingClientRect();
+  const dropY = e.clientY;
+  const isAfter = dropY > targetRect.top + targetRect.height / 2;
+  clearModelDropIndicator();
+  this.classList.add("drag-over-target");
+  this.classList.toggle("drop-after", isAfter);
+  dropTargetIndicator = this;
+}
+
+function handleModelDragEnter(e) {
+  e.preventDefault();
+}
+
+function handleModelDragLeave(e) {
+  if (!this.contains(e.relatedTarget) && dropTargetIndicator === this) {
+    clearModelDropIndicator();
+  }
+}
+
+function handleModelDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!draggedItem || draggedItem === this) {
+    clearModelDropIndicator();
+    return;
+  }
+  const targetRect = this.getBoundingClientRect();
+  const dropY = e.clientY;
+  const isAfter = dropY > targetRect.top + targetRect.height / 2;
+  if (isAfter) {
+    this.parentNode.insertBefore(draggedItem, this.nextSibling);
+  } else {
+    this.parentNode.insertBefore(draggedItem, this);
+  }
+  clearModelDropIndicator();
+  // Pode adicionar outras atualizações após a reorganização, se necessário
+}
+
+function handleModelDragEnd(e) {
+  if (draggedItem) {
+    draggedItem.classList.remove("dragging");
+  }
+  clearModelDropIndicator();
+  draggedItem = null;
+}
+
+function clearModelDropIndicator() {
+  const indicators = modelContainer.querySelectorAll(".drag-over-target");
+  indicators.forEach((el) => {
+    el.classList.remove("drag-over-target", "drop-after");
+  });
+  dropTargetIndicator = null;
+}
+
 parameterContainer.querySelectorAll(".parameter-input-group").forEach(addDragDropListeners); // Tambahkan listener ke elemen awal
+modelContainer.querySelectorAll(".model-input-group").forEach(addDragDropListenersForModel); // Tambahkan listener ke elemen awal
 
 // --- Fungsi Pengelolaan Grafik & Penyimpanan ---
 
@@ -652,7 +733,7 @@ async function updateDataInFirestore(docId, dataToUpdate) {
     window.toast("Update Error", { description: "ID Dokumen untuk update tidak ditemukan.", type: "danger", position: "top-center" });
     return;
   }
-  window.toast("Memperbarui...", { description: "Memperbarui data di Firebase...", type: "info", position: "top-center",saveToDb: false });
+  window.toast("Memperbarui...", { description: "Memperbarui data di Firebase...", type: "info", position: "top-center", saveToDb: false });
 
   // Gunakan shallow copy untuk data storage
   const dataForStorage = { ...dataToUpdate };
@@ -935,7 +1016,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 menit
 
 async function getRecentParameterNames() {
   const now = Date.now();
-  if (recentParameterNamesCache && (now - cacheTimestamp < CACHE_DURATION)) {
+  if (recentParameterNamesCache && now - cacheTimestamp < CACHE_DURATION) {
     return recentParameterNamesCache;
   }
 
@@ -950,8 +1031,8 @@ async function getRecentParameterNames() {
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       if (data && Array.isArray(data.parameterNames)) {
-        data.parameterNames.forEach(name => {
-          if (typeof name === 'string' && name.trim() !== '') {
+        data.parameterNames.forEach((name) => {
+          if (typeof name === "string" && name.trim() !== "") {
             parameterNamesSet.add(name.trim());
           }
         });
@@ -985,11 +1066,12 @@ async function showParameterSuggestions(inputElement) {
     noSuggestionItem.textContent = "Tidak ada histori parameter.";
     suggestionsContainer.appendChild(noSuggestionItem);
   } else {
-    uniqueNames.forEach(name => {
+    uniqueNames.forEach((name) => {
       const item = document.createElement("div");
       item.className = "suggestion-item";
       item.textContent = name;
-      item.onmousedown = (e) => { // Gunakan onmousedown agar blur tidak terjadi sebelum klik
+      item.onmousedown = (e) => {
+        // Gunakan onmousedown agar blur tidak terjadi sebelum klik
         e.preventDefault(); // Cegah blur pada input
         inputElement.value = name;
         handleParameterNameInput(inputElement); // Update label skor jika ada
@@ -1003,17 +1085,17 @@ async function showParameterSuggestions(inputElement) {
 }
 
 function hideParameterSuggestionsWithDelay(inputElement) {
-    // Delay kecil untuk memungkinkan event klik pada item saran diproses
-    setTimeout(() => {
-        const wrapper = inputElement.closest(".parameter-input-wrapper");
-        if (!wrapper) return;
-        const suggestionsContainer = wrapper.querySelector(".parameter-suggestions-container");
-        // Hanya sembunyikan jika mouse tidak di atas kontainer saran
-        if (suggestionsContainer && !suggestionsContainer.matches(':hover')) {
-            suggestionsContainer.classList.remove("active");
-            activeSuggestionsContainer = null;
-        }
-    }, 50);
+  // Delay kecil untuk memungkinkan event klik pada item saran diproses
+  setTimeout(() => {
+    const wrapper = inputElement.closest(".parameter-input-wrapper");
+    if (!wrapper) return;
+    const suggestionsContainer = wrapper.querySelector(".parameter-suggestions-container");
+    // Hanya sembunyikan jika mouse tidak di atas kontainer saran
+    if (suggestionsContainer && !suggestionsContainer.matches(":hover")) {
+      suggestionsContainer.classList.remove("active");
+      activeSuggestionsContainer = null;
+    }
+  }, 50);
 }
 
 function filterParameterSuggestions(inputElement) {
@@ -1025,7 +1107,7 @@ function filterParameterSuggestions(inputElement) {
 
   const items = suggestionsContainer.querySelectorAll(".suggestion-item");
   let hasVisibleItems = false;
-  items.forEach(item => {
+  items.forEach((item) => {
     if (item.classList.contains("no-suggestions")) return; // Jangan filter item 'no-suggestions'
     const itemName = item.textContent.toLowerCase();
     if (itemName.includes(filterText)) {
@@ -1245,7 +1327,7 @@ function loadHistoryEntry(docId) {
     // Data sudah dalam format { scores: { paramName: value } }
     generateChartFromData(data, true); // Tampilkan grafik & tabel kesimpulan
     closeHistoryModal();
-    window.toast("Histori Dimuat", { description: `Menampilkan grafik dari histori (${formatFirestoreTimestamp(data.timestamp)})`, type: "info", position: "top-right",saveToDb: false });
+    window.toast("Histori Dimuat", { description: `Menampilkan grafik dari histori (${formatFirestoreTimestamp(data.timestamp)})`, type: "info", position: "top-right", saveToDb: false });
     if (isEditMode) {
       cancelEdit();
     } // Keluar mode edit jika sedang aktif
@@ -1357,7 +1439,7 @@ function loadDataForEdit(docId) {
   editModeInfo.classList.remove("hidden");
   generateChartFromData(data, true); // Tampilkan grafik & tabel kesimpulan
   closeHistoryModal();
-  window.toast("Mode Edit Aktif", { description: `Memuat data dari ${formatFirestoreTimestamp(data.timestamp)} untuk diedit.`, type: "info", position: "top-right",saveToDb: false });
+  window.toast("Mode Edit Aktif", { description: `Memuat data dari ${formatFirestoreTimestamp(data.timestamp)} untuk diedit.`, type: "info", position: "top-right", saveToDb: false });
 }
 // Batal mode edit
 function cancelEdit() {
@@ -1691,6 +1773,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   updateModelInputs(); // Update skor awal
   parameterContainer.querySelectorAll(".parameter-input-group").forEach(addDragDropListeners); // Tambah D&D
+  modelContainer.querySelectorAll(".model-input-group").forEach(addDragDropListenersForModel); // Tambah D&D
   parameterContainer.querySelectorAll(".parameter-name").forEach((input) => {
     input.addEventListener("input", () => handleParameterNameInput(input));
   }); // Listener nama param
