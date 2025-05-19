@@ -71,22 +71,6 @@ function initializeFirebase() {
       firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
       console.log("Firebase berhasil diinisialisasi.");
-      // Aktifkan tombol utama & histori & notifikasi
-      generateChartBtn.disabled = false;
-      generateChartBtn.title = "";
-      generateChartBtn.classList.remove("opacity-50", "cursor-not-allowed");
-      viewHistoryBtn.disabled = false;
-      viewHistoryBtn.title = "";
-      viewHistoryBtn.classList.remove("opacity-50", "cursor-not-allowed");
-      resetChartBtn.disabled = false;
-      resetChartBtn.classList.remove("hidden");
-      if (viewNotificationBtn) {
-        // Cek jika tombol notifikasi ada
-        viewNotificationBtn.disabled = false;
-        viewNotificationBtn.title = "Lihat Notifikasi";
-        viewNotificationBtn.classList.remove("opacity-50", "cursor-not-allowed");
-        fetchAndUpdateNotificationBadge(); // Muat badge awal
-      }
     }
   } catch (error) {
     console.error("Gagal menginisialisasi Firebase:", error);
@@ -107,7 +91,6 @@ function initializeFirebase() {
     }
   }
 }
-// Panggil init setelah Alpine siap (event listener di bawah)
 
 // --- Fungsi Utilitas ---
 function generateUniqueId(prefix = "id") {
@@ -522,9 +505,6 @@ function clearModelDropIndicator() {
   });
   dropTargetIndicator = null;
 }
-
-parameterContainer.querySelectorAll(".parameter-input-group").forEach(addDragDropListeners); // Tambahkan listener ke elemen awal
-modelContainer.querySelectorAll(".model-input-group").forEach(addDragDropListenersForModel); // Tambahkan listener ke elemen awal
 
 // --- Fungsi Pengelolaan Grafik & Penyimpanan ---
 
@@ -1009,7 +989,6 @@ function renderNewFusionChart(dataSource) {
 }
 
 // --- Fungsi untuk Histori ---
-
 let recentParameterNamesCache = null;
 let cacheTimestamp = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 menit
@@ -1695,28 +1674,50 @@ async function executeClearAllNotifications() {
 }
 
 // --- Event Listeners ---
-addParameterBtn.addEventListener("click", () => addParameterInput());
-addModelBtn.addEventListener("click", () => addModelInput());
-generateChartBtn.addEventListener("click", handleGenerateChartAndSave); // Tombol utama
-resetChartBtn.addEventListener("click", handleResetChart); // Tombol reset
-viewHistoryBtn.addEventListener("click", openHistoryModal);
-cancelEditBtn.addEventListener("click", cancelEdit); // Tombol Batal Edit memanggil fungsi ini
-closeHistoryModalBtn.addEventListener("click", closeHistoryModal);
-historyModal.addEventListener("click", (event) => {
-  if (event.target === historyModal) {
-    closeHistoryModal();
-  }
-}); // Klik luar modal histori
-cancelDeleteBtnModal.addEventListener("click", closeDeleteConfirmModal);
-confirmDeleteBtn.addEventListener("click", executeDeleteHistoryEntry);
+if (addParameterBtn) {
+  addParameterBtn.addEventListener("click", () => addParameterInput());
+}
+if (addModelBtn) {
+  addModelBtn.addEventListener("click", () => addModelInput());
+}
+if (generateChartBtn) {
+  generateChartBtn.addEventListener("click", handleGenerateChartAndSave); // Tombol utama
+}
+if (resetChartBtn) {
+  resetChartBtn.addEventListener("click", handleResetChart); // Tombol reset
+}
+if (viewHistoryBtn) {
+  viewHistoryBtn.addEventListener("click", openHistoryModal);
+}
+if (cancelEditBtn) {
+  cancelEditBtn.addEventListener("click", cancelEdit); // Tombol Batal Edit memanggil fungsi ini
+}
+if (closeHistoryModalBtn) {
+  closeHistoryModalBtn.addEventListener("click", closeHistoryModal);
+}
+if (historyModal) {
+  historyModal.addEventListener("click", (event) => {
+    if (event.target === historyModal) {
+      closeHistoryModal();
+    }
+  });
+}
+if (cancelDeleteBtnModal) {
+  cancelDeleteBtnModal.addEventListener("click", closeDeleteConfirmModal);
+}
+if (confirmDeleteBtn) {
+  confirmDeleteBtn.addEventListener("click", executeDeleteHistoryEntry);
+}
 if (closeDeleteConfirmModalBtn) {
   closeDeleteConfirmModalBtn.addEventListener("click", closeDeleteConfirmModal);
 }
-deleteConfirmModal.addEventListener("click", (event) => {
-  if (event.target === deleteConfirmModal) {
-    closeDeleteConfirmModal();
-  }
-}); // Klik luar modal hapus
+if (deleteConfirmModal) {
+  deleteConfirmModal.addEventListener("click", (event) => {
+    if (event.target === deleteConfirmModal) {
+      closeDeleteConfirmModal();
+    }
+  });
+}
 
 // Event Listener Notifikasi
 if (viewNotificationBtn) {
@@ -1768,21 +1769,23 @@ if (clearAllNotificationsConfirmModal) {
 document.addEventListener("DOMContentLoaded", () => {
   console.log("DOM fully loaded and parsed");
   // Beri ID unik ke elemen awal jika belum ada
-  parameterContainer.querySelectorAll(".parameter-input-group:not([data-param-id])").forEach((el, i) => (el.dataset.paramId = `param_initial_${i}`));
-  modelContainer.querySelectorAll(".model-input-group:not([data-model-id])").forEach((el, i) => (el.dataset.modelId = `model_initial_${i}`));
+  if (parameterContainer && modelContainer) {
+    parameterContainer.querySelectorAll(".parameter-input-group:not([data-param-id])").forEach((el, i) => (el.dataset.paramId = `param_initial_${i}`));
+    modelContainer.querySelectorAll(".model-input-group:not([data-model-id])").forEach((el, i) => (el.dataset.modelId = `model_initial_${i}`));
+    parameterContainer.querySelectorAll(".parameter-input-group").forEach(addDragDropListeners); // Tambah D&D
+    modelContainer.querySelectorAll(".model-input-group").forEach(addDragDropListenersForModel); // Tambah D&D
+    parameterContainer.querySelectorAll(".parameter-name").forEach((input) => {
+      input.addEventListener("input", () => handleParameterNameInput(input));
+    }); // Listener nama param
+    updateModelInputs(); // Update skor awal
+    updateRemoveButtons("#parameterContainer", ".parameter-input-group"); // Status tombol hapus awal
+    updateRemoveButtons("#modelContainer", ".model-input-group");
+  }
 
-  updateModelInputs(); // Update skor awal
-  parameterContainer.querySelectorAll(".parameter-input-group").forEach(addDragDropListeners); // Tambah D&D
-  modelContainer.querySelectorAll(".model-input-group").forEach(addDragDropListenersForModel); // Tambah D&D
-  parameterContainer.querySelectorAll(".parameter-name").forEach((input) => {
-    input.addEventListener("input", () => handleParameterNameInput(input));
-  }); // Listener nama param
-  updateRemoveButtons("#parameterContainer", ".parameter-input-group"); // Status tombol hapus awal
-  updateRemoveButtons("#modelContainer", ".model-input-group");
-
-  // Panggil inisialisasi Firebase setelah DOM siap,
+  // Panggil inisialisasi fungsi setelah DOM siap,
   // Alpine akan menginisialisasi komponennya sendiri setelahnya
   initializeFirebase();
+  fetchAndUpdateNotificationBadge();
 });
 
 // GSAP Preloader Animation
