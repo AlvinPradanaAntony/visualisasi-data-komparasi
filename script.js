@@ -131,8 +131,12 @@ function clearFormInputs() {
       group.dataset.paramId = generateUniqueId("param");
       const input = group.querySelector(".parameter-name");
       if (input) input.value = "";
+      // Hapus saran jika ada
+      const suggestionsContainer = group.querySelector(".parameter-suggestions-container");
+      if (suggestionsContainer) suggestionsContainer.innerHTML = "";
     }
   });
+  // Jika tidak ada parameter sama sekali setelah reset, tambahkan satu yang baru
   if (parameterContainer.children.length === 0) addParameterInput();
   const modelGroups = modelContainer.querySelectorAll(".model-input-group");
   modelGroups.forEach((group, index) => {
@@ -151,15 +155,17 @@ function clearFormInputs() {
       }
     }
   });
+  // Jika tidak ada model sama sekali setelah reset, tambahkan satu yang baru
   if (modelContainer.children.length === 0) addModelInput();
   updateModelInputs(); // Ini akan memanggil updateModelInputsForGroup
   updateRemoveButtons("#parameterContainer", ".parameter-input-group");
   updateRemoveButtons("#modelContainer", ".model-input-group");
-  // Kosongkan juga tabel kesimpulan
-  if (summaryTableContainer) {
-    summaryTableContainer.innerHTML = '<div id="summaryTable"></div>'; // Reset ke placeholder
-  }
+
+  // if (summaryTableContainer) { // BARIS INI DIKOMENTARI
+  //   summaryTableContainer.innerHTML = '<div id="summaryTable"></div>'; // Reset ke placeholder // BARIS INI DIKOMENTARI
+  // } // BARIS INI DIKOMENTARI
 }
+
 function removeInputGroup(button, containerSelector, groupSelector, callback = null) {
   const container = document.querySelector(containerSelector);
   if (container.querySelectorAll(groupSelector).length > 1) {

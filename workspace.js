@@ -9,6 +9,8 @@ const generateWorkspaceChartBtn = document.getElementById("generateWorkspaceChar
 const resetWorkspaceBtn = document.getElementById("resetWorkspaceBtn");
 const workspaceChartContainer = document.getElementById("workspaceChartContainer");
 const workspaceChart = document.getElementById("workspaceChart");
+const workspaceSummaryTableContainer = document.getElementById("workspaceSummaryTableContainer"); // Tambahkan ini
+const workspaceSummaryTable = document.getElementById("workspaceSummaryTable"); // Tambahkan ini
 
 let droppedModels = [];
 let availableModels = [];
@@ -126,13 +128,13 @@ function renderStaticFallbackModels() {
   const fallbackModels = [
     {
       id: "model1",
-        name: "Model A",
-        description: "Sample model for testing purposes",
-        parameters: [
-          { name: "Accuracy", score: 85 },
-          { name: "Robustness", score: 72 },
-          { name: "Speed", score: 90 },
-        ],
+      name: "Model A",
+      description: "Sample model for testing purposes",
+      parameters: [
+        { name: "Accuracy", score: 85 },
+        { name: "Robustness", score: 72 },
+        { name: "Speed", score: 90 },
+      ],
     },
     {
       id: "model2",
@@ -329,6 +331,7 @@ function updateDropContainerUI() {
 
     // Hide the chart if it was visible
     workspaceChartContainer.classList.add("hidden");
+    workspaceSummaryTableContainer.classList.add("hidden"); // Sembunyikan tabel juga
   }
 }
 
@@ -349,6 +352,7 @@ function generateChart() {
 
   // Show the chart container
   workspaceChartContainer.classList.remove("hidden");
+  workspaceSummaryTableContainer.classList.remove("hidden"); // Tampilkan kontainer tabel
 
   // Collect all unique parameters (categories for the chart)
   const allParameters = new Set();
@@ -374,7 +378,7 @@ function generateChart() {
     datasets.push(dataset);
   });
 
-  // Create the multi-series bar chart (msbar2d)
+    // Create the multi-series bar chart (msbar2d)
   if (fusionChartInstanceWorkspace) {
     fusionChartInstanceWorkspace.dispose(); // Dispose of the old chart if it exists
   }
@@ -413,6 +417,98 @@ function generateChart() {
   });
   fusionChartInstanceWorkspace.render();
   showSuccess("Grafik berhasil dibuat!", "Grafik perbandingan model telah ditampilkan.");
+
+  // Generate summary table for workspace
+  generateWorkspaceSummaryTable({
+    parameterNames: categories.map((c) => c.label),
+    models: droppedModels.map((model) => ({
+      name: model.name,
+      scores: model.parameters.map((param) => ({
+        parameter: param.name,
+        value: param.score,
+      })),
+    })),
+  }); // Panggil fungsi untuk membuat tabel
+}
+
+// --- Tambahkan fungsi untuk membuat tabel kesimpulan di workspace ---
+function generateWorkspaceSummaryTable(chartData) {
+  if (!workspaceSummaryTable) {
+    console.error("Elemen #workspaceSummaryTable tidak ditemukan.");
+    return;
+  }
+  workspaceSummaryTable.innerHTML = ""; // Kosongkan tabel sebelumnya
+
+  if (!chartData || !chartData.parameterNames || chartData.parameterNames.length === 0 || !chartData.models || chartData.models.length === 0) {
+    workspaceSummaryTable.innerHTML = '<p class="text-center text-gray-500 italic p-4">Data tidak cukup untuk membuat kesimpulan.</p>';
+    return;
+  }
+
+  let tableHtml = `
+    <h3 class="text-base md:text-lg font-semibold mb-3 text-gray-700 text-center mt-4">Kesimpulan Model Unggulan per Kategori (Workspace)</h3>
+    <div class="overflow-x-auto bg-white border border-gray-200 rounded-lg shadow-sm">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">🌟 Kategori Terbaik</th>
+                    <th scope="col" class="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">🏆 Model Unggulan</th>
+                    <th scope="col" class="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">🏅 Peringkat Model</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+    `;
+
+  chartData.parameterNames.forEach((paramName) => {
+    let modelsWithScores = chartData.models
+      .map((model) => {
+        const scoreObj = model.scores.find((s) => s.parameter === paramName);
+        const score = scoreObj ? parseFloat(scoreObj.value) : -1;
+        return {
+          name: model.name,
+          score: isNaN(score) ? -1 : score,
+        };
+      })
+      .filter((model) => model.score !== -1)
+      .sort((a, b) => b.score - a.score);
+
+    let winners = [];
+    let maxScore = -1;
+    if (modelsWithScores.length > 0) {
+      maxScore = modelsWithScores[0].score;
+      winners = modelsWithScores.filter((model) => model.score === maxScore).map((m) => m.name);
+    }
+
+    let rankingHtml = "";
+    if (modelsWithScores.length > 0) {
+      const topModels = modelsWithScores.slice(0, 3);
+      const medals = ["🥇", "🥈", "🥉"];
+      rankingHtml = topModels
+        .map((model, index) => {
+          return `${medals[index] || ""} ${model.name} (${model.score.toFixed(2)}%)`;
+        })
+        .join("<br>");
+    } else {
+      rankingHtml = '<span class="italic text-gray-400">N/A</span>';
+    }
+
+    tableHtml += `
+        <tr class="hover:bg-gray-50 transition-colors duration-150">
+            <td class="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm font-medium text-gray-900">${paramName}</td>
+            <td class="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-700">
+                ${maxScore === -1 ? '<span class="italic text-gray-400">N/A</span>' : winners.join(" / ")}
+                ${maxScore !== -1 ? ` <span class="text-xs text-gray-400">(${maxScore.toFixed(2)}%)</span>` : ""}
+            </td>
+            <td class="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-xs md:text-sm text-gray-700">${rankingHtml}</td>
+        </tr>
+    `;
+  });
+
+  tableHtml += `
+            </tbody>
+        </table>
+    </div>
+  `;
+  workspaceSummaryTable.innerHTML = tableHtml;
 }
 
 // --- Event Listeners ---
@@ -424,6 +520,7 @@ resetWorkspaceBtn.addEventListener("click", function () {
   droppedModels = [];
   updateDropContainerUI();
   workspaceChartContainer.classList.add("hidden");
+  workspaceSummaryTableContainer.classList.add("hidden"); // Sembunyikan tabel juga
   showInfo("Workspace direset", "Semua model telah dihapus dari workspace.");
 });
 document.addEventListener("DOMContentLoaded", function () {
