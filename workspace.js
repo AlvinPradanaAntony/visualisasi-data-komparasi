@@ -34,11 +34,12 @@ function showSuccess(message, description = "") {
   });
 }
 
-function showInfo(message, description = "") {
+function showInfo(message, description = "", saveToDb = false) {
   window.toast(message, {
     description: description,
     type: "info",
     position: "top-center",
+    saveToDb: saveToDb,
   });
 }
 
@@ -90,12 +91,17 @@ async function loadAvailableModels() {
             }
           }
 
+          // Generate pastel color ONCE and store it
+          const hue = Math.floor(Math.random() * 360);
+          const pastelColor = `hsl(${hue}, 70%, 90%)`;
+          const generatedPastelColorHex = Utils.convertHslStringToHexString(pastelColor);
+
           const processedModel = {
             id: modelId,
             name: model.name || "Unnamed Model",
-            description: model.description || `Model from document ${doc.id}`, // Add a generic description if none
-            parameters: parameters,
-            // Store original doc id and model index if needed later
+            description: model.description,
+            parameters: [],
+            pastelColorHex: generatedPastelColorHex,
             originalDocId: doc.id,
             originalModelIndex: index,
           };
@@ -116,7 +122,6 @@ async function loadAvailableModels() {
   } catch (error) {
     console.error("Error loading models:", error);
     showError("Gagal memuat model", "Terjadi kesalahan saat memuat data model dari Firebase.");
-    renderStaticFallbackModels(); // Fallback on error
   }
 }
 
@@ -175,10 +180,15 @@ function createModelCard(modelData) {
   card.setAttribute("draggable", "true");
   card.setAttribute("data-model-id", modelData.id);
 
-  // Create random pastel background color for the header
-  const hue = Math.floor(Math.random() * 360);
-  const pastelColor = `hsl(${hue}, 70%, 90%)`;
-  const pastelColorHex = Utils.convertHslStringToHexString(pastelColor);
+  // Use stored color if available, otherwise generate (for safety/fallback)
+  let headerColorHex = modelData.pastelColorHex;
+  if (!headerColorHex) {
+    const hue = Math.floor(Math.random() * 360);
+    const pastelColor = `hsl(${hue}, 70%, 90%)`;
+    headerColorHex = Utils.convertHslStringToHexString(pastelColor);
+    // Optionally, if modelData is part of availableModels and mutable, you could store it back:
+    // if (availableModels.find(m => m.id === modelData.id)) modelData.pastelColorHex = headerColorHex;
+  }
 
   // Generate parameter badges HTML
   let parameterBadgesHTML = "";
@@ -206,7 +216,7 @@ function createModelCard(modelData) {
   }
 
   card.innerHTML = `
-      <div class="h-16 -mx-4 -mt-4 mb-3 bg-gradient-to-r from-[${pastelColorHex}] to-white rounded-t-lg flex items-end px-4 pb-2">
+      <div class="h-16 -mx-4 -mt-4 mb-3 bg-gradient-to-r from-[${headerColorHex}] to-white rounded-t-lg flex items-end px-4 pb-2">
         <h3 class="font-semibold text-gray-800 truncate">${modelData.name || "Unnamed Model"}</h3>
         ${avgScore}
       </div>
@@ -319,6 +329,7 @@ function updateDropContainerUI() {
     emptyDropState.classList.add("hidden");
     droppedModelsContainer.classList.remove("hidden");
     generateWorkspaceChartBtn.disabled = false;
+    resetWorkspaceBtn.disabled = false;
 
     // Add cards for all dropped models
     droppedModels.forEach((model) => {
@@ -328,6 +339,7 @@ function updateDropContainerUI() {
     emptyDropState.classList.remove("hidden");
     droppedModelsContainer.classList.add("hidden");
     generateWorkspaceChartBtn.disabled = true;
+    resetWorkspaceBtn.disabled = true;
 
     // Hide the chart if it was visible
     workspaceChartContainer.classList.add("hidden");
@@ -378,7 +390,7 @@ function generateChart() {
     datasets.push(dataset);
   });
 
-    // Create the multi-series bar chart (msbar2d)
+  // Create the multi-series bar chart (msbar2d)
   if (fusionChartInstanceWorkspace) {
     fusionChartInstanceWorkspace.dispose(); // Dispose of the old chart if it exists
   }
@@ -523,11 +535,13 @@ resetWorkspaceBtn.addEventListener("click", function () {
   workspaceSummaryTableContainer.classList.add("hidden"); // Sembunyikan tabel juga
   showInfo("Workspace direset", "Semua model telah dihapus dari workspace.");
 });
+
 document.addEventListener("DOMContentLoaded", function () {
+  generateWorkspaceChartBtn.disabled = true;
+  resetWorkspaceBtn.disabled = true;
   // --- Initialization ---
   // Load models when the page loads
   loadAvailableModels();
-
   // Handle notifications from main script if available
   if (window.fetchAndUpdateNotificationBadge) {
     window.fetchAndUpdateNotificationBadge();

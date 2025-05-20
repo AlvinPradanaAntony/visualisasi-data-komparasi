@@ -160,10 +160,6 @@ function clearFormInputs() {
   updateModelInputs(); // Ini akan memanggil updateModelInputsForGroup
   updateRemoveButtons("#parameterContainer", ".parameter-input-group");
   updateRemoveButtons("#modelContainer", ".model-input-group");
-
-  // if (summaryTableContainer) { // BARIS INI DIKOMENTARI
-  //   summaryTableContainer.innerHTML = '<div id="summaryTable"></div>'; // Reset ke placeholder // BARIS INI DIKOMENTARI
-  // } // BARIS INI DIKOMENTARI
 }
 
 function removeInputGroup(button, containerSelector, groupSelector, callback = null) {
